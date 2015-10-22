@@ -2,7 +2,7 @@
 
 The program is command-line driven. The Syntax is
    
-    $ gedi [ -options | --options parameters ]
+    $ gedi [ -options | --options <parameters> ]
 
 where options preceded by a single hyphen work by themselves, and those with two hyphens must be followed by a parameter.
 
