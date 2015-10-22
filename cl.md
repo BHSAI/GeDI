@@ -38,7 +38,7 @@ for lambda1, lambda2, respectively (these are defaults). For the latter, multipl
 
     --ld 1e-3 0.01 0.1
 
-to repeat the analysis with different conditions. When multiple values are used, the parameter sets for these values will be concatenated into the output file. This feature is useful when examining the performance of the model with a range of different penalizer values, and can be combined with [cross-validation](CV).
+to repeat the analysis with different conditions. When multiple values are used, the parameter sets for these values will be concatenated into the output file. This feature is useful when examining the performance of the model with a range of different penalizer values, and can be combined with [cross-validation](cv.md).
 
 Tolerance and maximum iteration are changed by 
 
@@ -59,7 +59,7 @@ This option can be applied to large data sets (_m_ up to thousands) with some co
 
     --eps 0.1 
 
-(default). Although CL should become IL with "--eps 0", the outcomes will not be exactly same because in CL, missing genotypes are counted as major alleles, and MF includes one prior count of individual with uniform genotype frequencies to avoid singularity. One can experiment with different values or use [cross-validation](CV) to find an optimal condition.
+(default). Although CL should become IL with "--eps 0", the outcomes will not be exactly same because in CL, missing genotypes are counted as major alleles, and MF includes one prior count of individual with uniform genotype frequencies to avoid singularity. One can experiment with different values or use [cross-validation](cv.md) to find an optimal condition.
 
 ###3. Exact enumeration (EE)
 
@@ -67,7 +67,7 @@ One may choose to do an exact enumeration (EE) DDA by specifying the option
 
      -ee 
 
-This is the most accurate method but the computational cost scales exponentially with the number of SNPs _m_; execution time will become impractical for _m_ much larger than ~20. Use a p-value cutoff (e.g., "--pcut 1e-7") to reduce the SNP number. EE is useful when trying to validate other approximate treatments (PL or MF). It uses the same penalizing parameters (lambda1, lambda2) as PL with the same syntax. Site and interaction [tests](Tests)
+This is the most accurate method but the computational cost scales exponentially with the number of SNPs _m_; execution time will become impractical for _m_ much larger than ~20. Use a p-value cutoff (e.g., "--pcut 1e-7") to reduce the SNP number. EE is useful when trying to validate other approximate treatments (PL or MF). It uses the same penalizing parameters (lambda1, lambda2) as PL with the same syntax. Site and interaction [tests](tests.md)
 can also be performed to calculate partial p-values of loci and interactions. These values from EE, if it is feasible to calculate them, will be more accurate than PL.
 
 ###4. Logistic regression (LR)
