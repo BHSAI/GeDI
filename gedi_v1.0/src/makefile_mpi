@@ -3,7 +3,7 @@ CC=mpic++
 #GSLDIR=/home/hwoo/local
 #CFLAGS=-I$(GSLDIR)/include -c -Wall -O2
 #LDFLAGS=-L$(GSLDIR)/lib -lgsl -lgslcblas -O2 -lmpi -lmpi++
-CFLAGS=-c -Wall -DMPI  # for MPI
+CFLAGS=-c -Wall -DMPIP  # for MPI
 LDFLAGS= -lgsl -lgslcblas -O2 -lmpi -lmpi++
 
 all: gedi
