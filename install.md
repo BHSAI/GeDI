@@ -1,6 +1,6 @@
 ##1. Installation
 
-The program can be downloaded from GeDI homepage, <http://github.com/BHSAI/GeDI>. There is a Linux 64bit execuitable at
+The program can be downloaded from GeDI homepage, <http://github.com/BHSAI/GeDI>. There is a Linux 64bit execuitable,
 
     gedi_v1.0/bin/gedi_linux_x86
 
