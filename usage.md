@@ -13,7 +13,7 @@ There are two main options specifying the analysis class (either one must be pre
     -il    Independent loci (IL) analysis. Each SNP is treated independent of others.
     -cl    Collective loci  (CL) analysis. SNPs interact with one another.
 
-These two analysis options are described in detail in [IL](il.md) and [CL](cl.md).
+These two analysis options are described in [IL](il.md) and [CL](cl.md).
 
 ###Output file
 
