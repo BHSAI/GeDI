@@ -16,8 +16,8 @@ The DDA will be run for control, case, and then combined ("pooled") groups seque
     rs#1  beta1    gamma12  gamma13  gamma14  ... gamma_1m
     rs#2  gamma21  beta2    gamma23  gamma24  ... gamma_2m
     rs#3  gamma31  gamma32  beta3    gamma34  ... gamma_3m
-    ...
-    rs#m  gamma_m1 gamma_m2 ...                   beta_m
+    ...                                           ...
+    rs#m  gamma_m1 gamma_m2 ...               ... beta_m
 
 where the first line shows alpha and disease prevalence values. Below the line, the first column lists rs-ID of SNPs, and the rest of columns show the square matrix with diagonal terms given by the single-locus risk parameter beta_i, and off-diagonal terms the pairwise risk parameter gamma_ij. If genotypic model was used, each site has two beta_i, and each site pair has 4 gamma_ij values. These are printed in (2m)x(2m) matrix form (m is no. of SNPs).
 
