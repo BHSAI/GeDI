@@ -55,7 +55,7 @@ More often, one has a single data set and wishes to perform cross-validation usi
     $ gedi -il -pr --bfile file --pcut 1e-20
     $ gedi -cl -pr --bfile file --pcut 1e-10 -genotypic
 
-In cross-validation, case and control samples are divided into _k_ ("multiplicity") equal subsets, from which _k_ training/test set pairs are formed:
+In cross-validation, case and control samples are divided into _k_ ("multiplicity") equal subsets, from which _k_ training/test set pairs are formed:
 
                 case                            control
                 |---------------------------|   |------------------------------|
