@@ -10,7 +10,7 @@ The input genotype data could either be an intermediate-sized SNP set obtained w
 
 Use "--pcut 1.0" to skip filtering (e.g., when using a pre-selected data set).
 
-The DDA will be run for control, case, and then combined ("pooled") groups sequentially. The collective likelihood ratio statistic and (asymptotic chi^2) p-value will be printed to standard output. Resulting parameters are written to the output file in the following format:
+The DDA will be run for control, case, and then combined ("pooled") groups sequentially. The collective likelihood ratio statistic and (asymptotic chi^2) p-value will be printed to standard output. Resulting parameters are written to the output file in the following format:
 
     alpha: 0.403 Pd: 0.632
     rs#1  beta1    gamma12  gamma13  gamma14  ... gamma_1m
