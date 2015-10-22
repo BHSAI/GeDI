@@ -16,4 +16,4 @@ Compile and install by
     $ make install
 
 ***
-[Back](Install)
+[Back](install.md)
