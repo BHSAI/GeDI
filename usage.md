@@ -34,7 +34,7 @@ Three models are supported for allelic effects (a=major allele, A=minor allele):
 
 ####1. ASCII files
 
-  The input data need to be in SNP-major format. The ASCII version is the PLINK "transposed" format, which consists of a phenotype file (e.g., "file.tfam"), where each line contains six entries for one individual:
+  The input data need to be in SNP-major format. The ASCII version is the PLINK "transposed" format, which consists of a phenotype file (e.g., "file.tfam"), where each line contains six entries for one individual:
 
     Family_ID  Ind_ID   Pat_ID   Mat_ID Sex Phenotype
 
@@ -52,7 +52,7 @@ Three models are supported for allelic effects (a=major allele, A=minor allele):
     1      rs311560  0      743268   T T  G T  ...  T T
     1      rs121219  0      766409   G A  A A  ...  A A
 
-  The two files have to be consistent. It is required that alleles are coded as T, C, A, G. Other letters will be interpreted as "missing" These files are specified using
+  The two files have to be consistent. It is required that alleles are coded as T, C, A, G. Other letters will be interpreted as "missing." These files are specified using
 
     --tped file.tped --tfam file.tfam
 
