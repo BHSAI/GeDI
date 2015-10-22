@@ -683,7 +683,7 @@ bool assoc(double f1[2][2],int nind[2],double &q,double &alpha,double beta[]){
    }
 
    if(q<0){
-     if(fabs(q>Tolq))           // somethings wrong
+     if(fabs(q)>Tolq)           // somethings wrong
        estop(83);
      else
        q=0;
@@ -931,7 +931,6 @@ void infer_par(int nv,const vector<vector<vector<short> > > &ai,double &alpha,
   int nind[2]={int(ai[0].size()),int(ai[1].size())};
   alpha=0;
   for(int i=0;i<nsnp;i++){
-    bool nna;               
     double q=0;
     for(int y=0;y<2;y++){
       f1[y][0]=f1[y][1]=0;
@@ -960,8 +959,8 @@ void infer_par(int nv,const vector<vector<vector<short> > > &ai,double &alpha,
       f1[y][1]/=nmiss[y];
     }
     double alp=0;
-    nna=assoc(f1,nmiss,q,alp,beta);      // GeDI inference 
-    if(q>0)
+    bool nna=assoc(f1,nmiss,q,alp,beta);      // GeDI inference 
+    if(q>0 && nna)
       pv[i]=gsl_sf_gamma_inc_Q(0.5*L,q/2);   
     else
       pv[i]=1.0;

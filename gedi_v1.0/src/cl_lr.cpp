@@ -222,7 +222,8 @@ double cl_min(const vector<string> &rs,const vector<vector<vector<short> > > &ai
   int nind[2]={int(ai[0].size()),int(ai[1].size())};
   int ntot=nind[0]+nind[1];
   double min=-ntot*(s->f);
-  double q0=2*(min-nind[1]*log(nind[1])-nind[0]*log(nind[0])+ntot*log(ntot));
+  double q0=2*(min-nind[1]*log(double(nind[1]))-nind[0]*log(double(nind[0]))
+      +ntot*log(double(ntot)));
 
   gsl_multimin_fdfminimizer_free(s);
   gsl_vector_free(x);
