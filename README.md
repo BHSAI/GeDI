@@ -3,4 +3,4 @@
 
 Implements discrete discriminant analysis of genotype-phenotype association inference
 
-See [wiki](wiki/Home) for documentation
+See [wiki](https://github.com/BHSAI/GeDI.wiki.git/Home) for documentation
