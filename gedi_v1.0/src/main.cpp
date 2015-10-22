@@ -81,7 +81,7 @@ int main(int argc,char* argv[]){
     cout << "-----------------------------------------------------------------" << endl;
     cout << "                                                                 " << endl;
     cout << "  Genotype distribution-based inference of disease association   " << endl;
-    cout << "  March 2015                                                  " << endl;
+    cout << "  October 2015                                                   " << endl;
     cout << "  Copyright(c) 2015 BHSAI, GNU General Public License            " << endl;
     cout << "  Author: Hyung Jun Woo (woo@bhsai.org)                          " << endl;
     cout << "                                                                 " << endl;

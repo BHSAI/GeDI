@@ -404,7 +404,6 @@ void il_tped(string &tped,string &tfam,string &meta_file,string &out_file,bool q
    header(of,nind);
    void tped_out(ofstream &outf,int nchr,string &rsn,string &fid,int pos,string &g0,string &g1);
    ofstream qcout;
-   bool nnat=true;
 
    ifstream *f0=new ifstream[nsample];
    for(int s=0;s<nsample;s++){
@@ -432,6 +431,7 @@ void il_tped(string &tped,string &tfam,string &meta_file,string &out_file,bool q
      int nchr;
      double qtot=0;
      int nmist[2]={0,}; // no. of non-missing individuals
+     bool nnat=true;
      while(1){             // loop over samples
        gi0="";
        gi1="";
