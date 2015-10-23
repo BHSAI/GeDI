@@ -18,7 +18,7 @@ which will create an executable file named gedi. Please edit makefile appropriat
     $ cp makefile_mpi makefile
     $ make
 
-Note that the mpi compiler and its options may differ depending on your system. Refer to your system parallel compilation documentation for details. The "-DMPI" option for the CC flag turns on the parallel part of the code.
+Note that the mpi compiler and its options may differ depending on your system. Refer to your system parallel compilation documentation for details. The "-DMPIP" option for the CC flag turns on the parallel part of the code.
 
 
 ***
