@@ -147,6 +147,9 @@ void read_par_cl(const vector<vector<vector<short> > > &ai,const string &par,
     av[1].resize(nind[1]);
     int i=0;
     int n=0;
+    int l0=0;
+    vector<vector<double> > dummy2;
+    vector<double> dummy1;
     while(getline(prf,line)){
       if(line.size()==0) continue;  // ignore blank line
       istringstream iss(line);
@@ -159,38 +162,45 @@ void read_par_cl(const vector<vector<vector<short> > > &ai,const string &par,
           end();
         }
       }
-      for(int y=0;y<2;y++) for(int k=0;k<nind[y];k++)
-        av[y][k].push_back(ai[y][k][n]);
-      vector<vector<double> > dummy2;
-      vector<double> dummy1;
-      th.gamm.push_back(dummy2);
+      if(l0==0){
+        for(int y=0;y<2;y++) for(int k=0;k<nind[y];k++)
+          av[y][k].push_back(ai[y][k][n]);
+        th.gamm.push_back(dummy2);
+      }
       double f=0;
       for(int j=0;j<i;j++){
-        th.gamm[i].push_back(dummy1);
-        for(int l0=0;l0<L*L;l0++){
+        if(l0==0) th.gamm[i].push_back(dummy1);
+        for(int l1=0;l1<L;l1++){
           iss >> f;
-          th.gamm[i][j].push_back(f);  // lower-left part
+          th.gamm[i][j].push_back(f);  // lower-triangle
         }
       }
-      th.beta.push_back(dummy1);       // diagonal term
-      th.gamm[i].push_back(dummy1);
-      for(int l0=0;l0<L;l0++) for(int l1=0;l1<L;l1++){
+      if(l0==0){
+        th.beta.push_back(dummy1);       // diagonal term
+        th.gamm[i].push_back(dummy1);
+      }
+      for(int l1=0;l1<L;l1++){
         iss >> f;
         if(l0==l1)
           th.beta[i].push_back(f);          // field
         th.gamm[i][i].push_back(0);      
       }
       int j=i+1;
-      while(iss >> f){
-        th.gamm[i].push_back(dummy1);
-        th.gamm[i][j].push_back(f);  // lower-left part
-        for(int l=1;l<L*L;l++){
+      while(iss >> f){                 // upper-triangle
+        if(l0==0)
+          th.gamm[i].push_back(dummy1);
+        th.gamm[i][j].push_back(f); 
+        for(int l=1;l<L;l++){
           iss >> f;
-          th.gamm[i][j].push_back(f);  // lower-left part
+          th.gamm[i][j].push_back(f); 
         }
         j++;
       }
-      i++;
+      l0++;
+      if(l0==L){
+        i++;
+        l0=0;
+      }
     }
     prf.close();
 }
