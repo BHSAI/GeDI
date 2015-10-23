@@ -12,4 +12,4 @@
 ***
 [Up](README.md)
 
-[Next](example.md)
+[Next](examples.md)
