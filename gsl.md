@@ -7,9 +7,9 @@ Download the latest version from [GSL](http://www.gnu.org/software/gsl/). Untar 
 
 Configure the installation by
 
-    $ ./configure --prefix=/home/username/local
+    $ ./configure --prefix=/home/usrname/local
 
-Replace the arguments of the "--prefix" with the target directory for the library where you have write access. If you omit "--prefix", the installation will default to /usr/local.
+replacing the argument of the "--prefix" with the target directory for the library where you have write access. If you omit "--prefix", the installation will default to /usr/local.
 
 Compile and install by
 

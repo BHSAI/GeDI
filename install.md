@@ -1,6 +1,6 @@
 ##1. Installation
 
-The program can be downloaded from GeDI homepage, <http://github.com/BHSAI/GeDI>. There is a Linux 64bit execuitable,
+The program can be downloaded from GeDI homepage, <http://github.com/BHSAI/GeDI>. There is a Linux 64 bit execuitable,
 
     gedi_v1.0/bin/gedi_linux_x86
 
@@ -18,7 +18,7 @@ which will create an executable file named gedi. Please edit makefile appropriat
     $ cp makefile_mpi makefile
     $ make
 
-Note that the mpi compiler and its options may differ depending on your system. Refer to your system parallel compilation documentation for details. The "-DMPI" option for the CC flag turns on the parallel part of the code.
+Note that the mpi compiler and its options may differ depending on your system. Refer to your system parallel compilation documentation for details. The "-DMPIP" option for the CC flag turns on the parallel part of the code.
 
 
 ***

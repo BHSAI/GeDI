@@ -1,6 +1,6 @@
 ##Basic usage
 
-The program is command-line driven. The Syntax is
+The program is command-line driven with the synopsis
    
     $ gedi [ -options | --options <parameters> ]
 
