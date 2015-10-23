@@ -52,4 +52,4 @@ Note the use of "--pcut 1"; this is to insist that GeDI select all supplied SNPs
 ***
 [Up](README.md)
 
-[Next](examples.md)
+[Next](limit.md)
