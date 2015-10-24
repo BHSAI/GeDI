@@ -9,7 +9,13 @@ These are case-control (1000 each, 2000 total) data of 100 SNP segment around rs
 
      ./example/run/gedi.sh
 
-illustrates some of the usage based on this data set.
+illustrates some of the usage based on this data set. Run this with
+
+     $ cd ./example/run/
+     
+     $ chmod 775 gedi.sh
+     
+     $ ./gedi.sh
 
 ***
 [Up](README.md)
