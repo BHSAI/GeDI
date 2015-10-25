@@ -1,12 +1,12 @@
+#ifdef MPIP
+#include <mpi.h>
+#endif
 #include <iostream>
 #include <fstream>
 #include <sstream>
 #include <iomanip>
 #include <cmath>
 #include <string>
-#ifdef MPIP
-#include <mpi.h>
-#endif
 #include "gedi.h"
 
 using namespace std;

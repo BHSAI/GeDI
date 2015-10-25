@@ -1,3 +1,6 @@
+#ifdef MPIP
+#include <mpi.h>
+#endif
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -14,9 +17,6 @@
 #include <gsl/gsl_multimin.h>
 #include <gsl/gsl_sf_gamma.h>
 #include <gsl/gsl_sf_erf.h>
-#ifdef MPIP
-#include <mpi.h>
-#endif
 #include "gedi.h"
 
 using namespace std;
