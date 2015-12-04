@@ -211,9 +211,15 @@ void il_bed(string &meta,string &out_file,bool q_lr){
     char minor,major,rsk;
     int nmist[2]={0,};
     bool nnat=true;
+    double teff=0;
     for(int s=0;s<nsample;s++){
-      int nsize=nptr[s+1][0]+nptr[s+1][1]-nptr[s][0]-nptr[s][1];
+      int ncase=nptr[s+1][1]-nptr[s][1];
+      int nctrl=nptr[s+1][0]-nptr[s][0];
+//    int nsize=nptr[s+1][0]+nptr[s+1][1]-nptr[s][0]-nptr[s][1];
+      int nsize=ncase+nctrl;
       int nbyte=ceil(nsize/4.);              // no. of bytes for each snp
+      double neff=2.0/sqrt(1.0/ncase+1.0/nctrl);  // effective sample size weight
+      teff+=neff;
       char *data=new char[nbyte];
       string gi0="";
       string gi1="";
@@ -286,15 +292,15 @@ void il_bed(string &meta,string &out_file,bool q_lr){
       }
       qtot+=q;
       nnat=nnat && nna;
-      alpha+=alp*nsize;
-      beta[0]+=bet[0]*nsize;
-      beta[1]+=bet[1]*nsize;
+      alpha+=alp*neff;
+      beta[0]+=bet[0]*neff;
+      beta[1]+=bet[1]*neff;
       nmist[0]+=nmiss[0];
       nmist[1]+=nmiss[1];
     } // end of sample loop
-    alpha/=ntot;
-    beta[0]/=ntot;
-    beta[1]/=ntot;
+    alpha/=teff;
+    beta[0]/=teff;
+    beta[1]/=teff;
     il_stat(of,nchr[i],rs[i],pos[i],minor,nmist,nnat,qtot,nsample,alpha,beta);
   }  // end of snp loop
 
@@ -377,7 +383,7 @@ void il_tped(string &tped,string &tfam,string &meta_file,string &out_file,bool q
    }
    nptr[nsample].push_back(nind[0]);
    nptr[nsample].push_back(nind[1]);
-   int ntot=nind[0]+nind[1];
+// int ntot=nind[0]+nind[1];
 
    string gi0,gi1;
    double f1[2][2]={{0,}};   // frequency f1[y=0,1][Aa,AA]
@@ -432,6 +438,7 @@ void il_tped(string &tped,string &tfam,string &meta_file,string &out_file,bool q
      double qtot=0;
      int nmist[2]={0,}; // no. of non-missing individuals
      bool nnat=true;
+     double teff=0;
      while(1){             // loop over samples
        gi0="";
        gi1="";
@@ -453,7 +460,12 @@ void il_tped(string &tped,string &tfam,string &meta_file,string &out_file,bool q
          iss >> c;
          gi1+=c;             // 2nd allele
        }
-       unsigned int nsize=nptr[s+1][0]-nptr[s][0]+nptr[s+1][1]-nptr[s][1];
+//     unsigned int nsize=nptr[s+1][0]-nptr[s][0]+nptr[s+1][1]-nptr[s][1];
+       unsigned int ncase=nptr[s+1][1]-nptr[s][1];
+       unsigned int nctrl=nptr[s+1][0]-nptr[s][0];
+       unsigned int nsize=ncase+nctrl;
+       double neff=2.0/sqrt(1.0/ncase+1.0/nctrl);
+       teff+=neff;
        if(gi0.size()!=nsize){
          if(master)
            cerr << " Genotype data in " << mtped[s] << " do not match " << mtfam[s] << endl;
@@ -501,17 +513,17 @@ void il_tped(string &tped,string &tfam,string &meta_file,string &out_file,bool q
        }
        nnat=nnat && nna;
        qtot+=q;
-       alpha+=alp*nsize;
-       beta[0]+=bet[0]*nsize;
-       beta[1]+=bet[1]*nsize;
+       alpha+=alp*neff;
+       beta[0]+=bet[0]*neff;
+       beta[1]+=bet[1]*neff;
        nmist[0]+=nmiss[0];
        nmist[1]+=nmiss[1];
        if(++s==nsample) break;
        getline(f0[s],line);
      }
-     alpha/=ntot;
-     beta[0]/=ntot;
-     beta[1]/=ntot;
+     alpha/=teff;
+     beta[0]/=teff;
+     beta[1]/=teff;
      if(master){
        if(nsnp>Npr && nsnp%Npr==0) 
          cout << "inferring parameters for " << nsnp << "'th SNP:\n";
