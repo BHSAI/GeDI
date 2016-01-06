@@ -311,14 +311,6 @@ int main(int argc,char* argv[]){
      if(master) cout << "Independent loci analysis\n\n";
      if(q_pr){
        if(master) cout << "Prediction mode\n\n";
-       if(q_meta){
-         if(master) cerr << "No IL prediction with meta-analysis. Bye!\n";
-         end();
-       }
-       if(!q_tped || !q_tfam){
-         if(master) cout << "Prediction requires tped/tfam. Bye!\n";
-         end();
-       }
        if(q_par){
          if(master) cout << "parameter file: " << par_file << endl << endl;
        }
@@ -347,8 +339,12 @@ int main(int argc,char* argv[]){
            il_bed(meta_file,out_file,q_lr);
          else
            il_tped(tped_file,tfam_file,meta_file,out_file,q_lr);
-       else
-         pr_tped(tped_file,tfam_file,par_file,out_file);
+       else{
+         if(bfile!="" || q_metab)
+           il_bpr(meta_file,out_file,par_file,q_lr);
+         else
+           pr_tped(tped_file,tfam_file,meta_file,par_file,out_file);
+       }
      }
      else{
        if(master) cerr << "Please specify tped/tfam (or binary) file. Bye!\n";

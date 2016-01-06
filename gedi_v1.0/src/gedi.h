@@ -16,7 +16,8 @@ void il_tped(std::string &tped,std::string &tfam,std::string &meta_file,std::str
 
 void il_bed(std::string &meta_file,std::string &bed,bool q_lr);
 
-void pr_tped(std::string &tped,std::string &tfam,std::string &par,std::string &out_file);
+void pr_tped(std::string &tped,std::string &tfam,std::string &meta,
+    std::string &par,std::string &out_file);
 
 void read_ped(int nsnp,std::ifstream &rf,std::vector<char> &minor,
     std::vector<std::vector<std::vector<short> > > &ai);
@@ -105,5 +106,7 @@ struct Par{
 void end();
 
 double q2p(double x,int k);
+
+void il_bpr(std::string &meta_file,std::string &out_file,std::string &par_file,bool q_lr);
 
 #endif
