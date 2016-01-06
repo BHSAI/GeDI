@@ -1484,10 +1484,8 @@ void snp_select_il(const vector<vector<vector<short> > > &ai,int nv,
       }
       double q=0;
       double bet[2]={0,};
-      if(pcut<1){
-        nna=assoc(fr1,nmiss,q,alp[s],bet);
-        if(!nna) break;
-      }
+      nna=assoc(fr1,nmiss,q,alp[s],bet);
+      if(!nna) break;
       qtot+=q;
       bet0[s]=bet[0];
       bet1[s]=bet[1];
