@@ -3,8 +3,8 @@ CC=g++
 #GSLDIR=/home/hwoo/local
 #CFLAGS=-I$(GSLDIR)/include -c -Wall -O2
 #LDFLAGS=-L$(GSLDIR)/lib -lgsl -lgslcblas -O2
-CFLAGS=-c -Wall -O2
-LDFLAGS=-lgsl -lgslcblas -O2
+CFLAGS=-c -Wall -g
+LDFLAGS=-lgsl -lgslcblas -g
 
 all: gedi
 

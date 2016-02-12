@@ -29,7 +29,6 @@ extern Model model;
 extern int L;
 extern unsigned int imax;; // maximum no. of iterations
 extern double tol;       // iteration tolerance
-const double Tolq=1.0e-5;
 extern vector<double> lambda;
 extern double eps;
 extern double Lh;        // penalizer for h
@@ -387,6 +386,13 @@ void bin_read(string &meta,int &nsample,vector<vector<int> > &nptr,
       if(Chr>0 && Chr!=nchr) continue;  // skip unless chr matches
       string snp;
       iss >> snp;
+      bool skip=false;
+      for(unsigned int k=0;k<exc_list.size();k++)
+        if(snp==exc_list[k]){
+          skip=true;
+          break;
+        }
+      if(skip) continue;
       if(s==0) rs.push_back(snp);
       else{
         if(snp!=rs[nsnp2]){
