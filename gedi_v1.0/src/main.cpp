@@ -26,6 +26,7 @@ bool q_marg=false;         // flag for marginal tests
 bool q_qij=false;          // flag for interaction LR statistic
 bool q_pi=true;            // flag for single-locus p-value
 bool q_pij=false;          // flag for interaction p-values
+bool q_dump=false;         // flag for writing SNP selection lists during IL-cv
 string excl_file="";       // snp exclusion list file 
 double pcut=-1;            // p-value cutoff for cross-validation
 double tol=1.0e-5;         // iteration tolerance
@@ -166,6 +167,8 @@ int main(int argc,char* argv[]){
          q_pl=true;
        else if(flag=="mf")
          q_mf=true;
+       else if(flag=="dump")
+         q_dump=true;
        else if(flag=="boot"){
          q_boot=true;
          if(master) cout << "Bootstrapping\n";

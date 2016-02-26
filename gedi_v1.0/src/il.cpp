@@ -24,6 +24,7 @@ extern int ncv;                   // cross-validation order
 extern bool q_cv;                 // true if cross-validation
 extern bool q_meta;               // true if meta-analysis
 extern bool q_metab;              // true if meta-analysis (binary)
+extern bool q_dump;               // true for writing SNP list during CV
 extern double pcut;               // p-value cutoff for cross-validation
 extern double hwe;
 extern double maf;
@@ -897,17 +898,36 @@ void read_par(ifstream &prf,double &alpha,vector<double> &beta1,vector<double> &
 }
 
 void pr(ofstream &of,const vector<vector<vector<vector<short> > > > &ai,
-    const vector<double> alpha,const vector<vector<double> > &beta1,
+    const vector<double> &alpha,const vector<vector<double> > &beta1,
     const vector<vector<double> > &beta2,const vector<double> &pv,vector<vector<double> > &risk){
 
   int nsample=ai.size();
   int nsnp=ai[0][0][0].size();
   int msnp=0;
+  double alp=0;
+  vector<double> bet1(nsnp),bet2(nsnp);
+
+  double teff=0;
+  for(int s=0;s<nsample;s++){
+    double neff=2.0/sqrt(1.0/ai[s][0].size()+1.0/ai[s][1].size());
+    alp+=alpha[s]*neff;
+    teff+=neff;
+    for(int i=0;i<nsnp;i++){
+      bet1[i]+=beta1[s][i]*neff;
+      bet2[i]+=beta2[s][i]*neff;
+    }
+  }
+  alp/=teff;
+  for(int i=0;i<nsnp;i++){
+    bet1[i]/=teff;
+    bet2[i]/=teff;
+  }
+
   for(int s=0;s<nsample;s++){
     int nind[2]={int(ai[s][0].size()),int(ai[s][1].size())};
     int nsnp=ai[s][0][0].size();
     for(int y=0;y<2;y++) for(int n=0;n<nind[y];n++){
-      double h=alpha[s];
+      double h=alp;
       msnp=0;
       for(int i=0;i<nsnp;i++){
         if(!q_cv){
@@ -917,16 +937,16 @@ void pr(ofstream &of,const vector<vector<vector<vector<short> > > > &ai,
         int a=ai[s][y][n][i];
         switch(model){
           case DOM:
-            h+=(a==1 || a==2)*beta1[s][i];
+            h+=(a==1 || a==2)*bet1[i];
             break;
           case REC:
-            h+=(a==2)*beta1[s][i];
+            h+=(a==2)*bet1[i];
             break;
           case GEN:
-            h+=(a==1)*beta1[s][i]+(a==2)*beta2[s][i];
+            h+=(a==1)*bet1[i]+(a==2)*bet2[i];
             break;
           case ADD:
-            if(a>0) h+=a*beta1[s][i];
+            if(a>0) h+=a*bet1[i];
             break;
           default:
             estop(19);
@@ -1206,6 +1226,7 @@ void pr_tped(string &tped,string &tfam,string &meta_file,string &par_file,string
     vector<double> &alpha,vector<vector<double> > &beta1,vector<vector<double> > &beta2);
 
    vector<vector<double> > risk;      // (risk,y)
+   double mav=0;
    if(q_cv){                          // cross-validation
      for(int nv=0;nv<ncv;nv++){
        vector<vector<vector<vector<short> > > > av(nsample);
@@ -1216,12 +1237,24 @@ void pr_tped(string &tped,string &tfam,string &meta_file,string &par_file,string
        snp_select_il(ai,nv,av,aw,rs,ra,nptr,alpha,beta1,beta2);
        int nsig=ra.size();
        cout << nsig << " SNPs selected with p < " << pcut << endl << endl;
+       if(q_dump){
+         ofstream file;
+         stringstream ia;
+         ia << nv;
+         file.open(("snp_list"+ia.str()+".txt").c_str(),ios::out);
+         for(int i=0;i<nsig;i++)
+           file << ra[i] << endl;
+         file.close();
+       }
+       mav+=nsig;
        if(nsig==0){
          cerr << " Try increasing pcut \n";
          exit(1);
        }
        pr(of,aw,alpha,beta1,beta2,pv,risk);
      }
+     mav/=ncv;
+     cout << "Mean no. of SNPs = " << mav << endl << endl;
    }
    else{
      prf.open(par_file.c_str(),ios::in);
@@ -1385,6 +1418,7 @@ void il_bpr(string &meta_file,string &out_file,string &par_file,bool q_lr){
 
   vector<vector<double> > risk;      // (risk,y)
   if(q_cv){
+    double mav=0;
     for(int nv=0;nv<ncv;nv++){
        vector<vector<vector<vector<short> > > >  av(nsample);
        vector<vector<vector<vector<short> > > >  aw(nsample);
@@ -1392,6 +1426,16 @@ void il_bpr(string &meta_file,string &out_file,string &par_file,bool q_lr){
        cout << "Cross-validation run " << nv+1 << ":\n";
        snp_select_il(ai,nv,av,aw,rs,ra,nptr,alpha,beta1,beta2);
        int nsig=ra.size();
+       if(q_dump){
+         ofstream file;
+         stringstream ia;
+         ia << nv;
+         file.open(("snp_list"+ia.str()+".txt").c_str(),ios::out);
+         for(int i=0;i<nsig;i++)
+           file << ra[i] << endl;
+         file.close();
+       }
+       mav+=nsig;
        cout << nsig << " SNPs selected with p < " << pcut << endl << endl;
        if(nsig==0){
          cerr << " Try increasing pcut \n";
@@ -1399,6 +1443,8 @@ void il_bpr(string &meta_file,string &out_file,string &par_file,bool q_lr){
        }
        pr(of,aw,alpha,beta1,beta2,pv,risk);
     }
+    mav/=ncv;
+    cout << "Mean no. of SNPs = " << mav << endl << endl;
   }
   else{
      prf.open(par_file.c_str(),ios::in);

@@ -208,17 +208,44 @@ void pr_cl(ofstream &of,const vector<vector<vector<vector<short> > > > &ai,Theta
     vector<vector<double> > &risk){
 
   int nsample=ai.size();
+  double alpha=0;
+  int nsnp=ai[0][0][0].size();
+  vector<vector<double> > beta(nsnp);
+  vector<vector<vector<double> > > gamm(nsnp);
+  for(int i=0;i<nsnp;i++){
+    beta[i].resize(L);
+    gamm[i].resize(nsnp);
+    for(int j=0;j<nsnp;j++) gamm[i][j].resize(L*L);
+  }
+
+  double teff=0;
+  for(int s=0;s<nsample;s++){
+    double neff=2.0/sqrt(1.0/ai[s][0].size()+1.0/ai[s][1].size());
+    alpha+=th[s].alpha*neff;
+    for(int i=0;i<nsnp;i++) for(int l1=0;l1<L;l1++){
+      beta[i][l1]+=th[s].beta[i][l1]*neff;
+      for(int j=0;j<nsnp;j++) for(int l2=0;l2<L;l2++)
+        gamm[i][j][2*l1+l2]+=th[s].gamm[i][j][2*l1+l2]*neff;
+    }
+    teff+=neff;
+  }
+  alpha/=teff;
+  for(int i=0;i<nsnp;i++) for(int l1=0;l1<L;l1++){
+    beta[i][l1]/=teff;
+    for(int j=0;j<nsnp;j++) for(int l2=0;l2<L;l2++)
+      gamm[i][j][2*l1+l2]/=teff;
+  }
 
   for(int s=0;s<nsample;s++){
     int nind[2]={int(ai[s][0].size()),int(ai[s][1].size())};
     int nsnp=ai[s][0][0].size();
     for(int y=0;y<2;y++) for(int n=0;n<nind[y];n++){
-      double h=th[s].alpha;
+      double h=alpha;
       for(int i=0;i<nsnp;i++){
         int a=ai[s][y][n][i];
         int ia=code(a,model);
         if(ia==0) continue;
-        h+=th[s].beta[i][ia-1];
+        h+=beta[i][ia-1];
         for(int j=i+1;j<nsnp;j++){
           int b=ai[s][y][n][j];
           int jb=code(b,model);
@@ -227,7 +254,7 @@ void pr_cl(ofstream &of,const vector<vector<vector<vector<short> > > > &ai,Theta
 //        if(ia==1 && jb==2) id=1                id=2*(ia-1)+jb-1
 //        if(ia==2 && jb==1) id=2
 //        if(ia==2 && jb==2) id=3
-          h+=(th[s].gamm[i][j][2*(ia-1)+jb-1]+th[s].gamm[j][i][2*(jb-1)+ia-1])/2;
+          h+=(gamm[i][j][2*(ia-1)+jb-1]+gamm[j][i][2*(jb-1)+ia-1])/2;
         }
       }
       double p=1.0/(1+exp(-h));
