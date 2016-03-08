@@ -30,7 +30,7 @@ extern int L;
 extern unsigned int imax;; // maximum no. of iterations
 extern double tol;       // iteration tolerance
 extern vector<double> lambda;
-extern double eps;
+extern vector<double> eps;
 extern double Lh;        // penalizer for h
 extern int Npr;
 const int Npr2=10;
@@ -60,6 +60,10 @@ extern long End;         // end position (1-based)
 extern bool q_boot;      // flag for bootstrapping
 extern bool q_strict;    // flag for strict run
 extern int Seed;         // random no. seed
+#ifdef MPIP
+extern bool q_mfp;        // flag for parallel MF
+const int Nb=32;         // block size for parallel MF (ScaLAPACK)
+#endif
 
 struct Pares{            // bundles of parameters for minimization
   const vector<vector<vector<short> > > &ai;
@@ -100,6 +104,12 @@ int code(int a,Model model){
 
   return 0;
 }
+
+#ifdef MPIP
+extern "C"{
+  void invrs_(double *mat,int *N,int *Nb,int *nproc,int *rank);
+};
+#endif
 
 // reads cl parameters
 
@@ -816,6 +826,12 @@ void cl_inf(vector<vector<vector<short> > > &ai,const vector<vector<int> > &nptr
   vector<vector<double> > risk;                  // (risk,y) 
   Theta *th=new Theta[nsample];
 
+  vector<double> para;
+  if(q_mf)
+    para=eps;
+  else
+    para=lambda;
+
   bool comp(vector<double> a,vector<double> b);
   void roc(vector<vector<double> > &risk);
   if(q_pr){         // prediction mode
@@ -827,17 +843,17 @@ void cl_inf(vector<vector<vector<short> > > &ai,const vector<vector<int> > &nptr
       roc(risk);
     }
     else{
-      for(unsigned int k=0;k<lambda.size();k++){
+      for(unsigned int k=0;k<para.size();k++){
         risk.resize(0);
         double s=0;
         double lnp=0;
         for(int nv=0;nv<ncv;nv++){
           if(master){
             if(q_mf)
-              cout << "Cross-validation run " << nv+1 << " with epsilon = " << eps << endl;
+              cout << "Cross-validation run " << nv+1 << " with epsilon = " << para[k] << endl;
             else
                 cout << "Cross-validation run " << nv+1 << " with lambda = (" << Lh
-                     << ", " << lambda[k] << ")\n";
+                     << ", " << para[k] << ")\n";
           }
           vector<vector<vector<vector<short> > > > av(nsample);  // genotype array for training set
           vector<vector<vector<vector<short> > > > aw(nsample);  // genotype array for test set
@@ -852,11 +868,11 @@ void cl_inf(vector<vector<vector<short> > > &ai,const vector<vector<int> > &nptr
           }
           double dev=0;
           if(!q_lr)
-            dev=cl_gdi(av,q_qi,ra,lambda[k],nptr,th);
+            dev=cl_gdi(av,q_qi,ra,para[k],nptr,th);
           else
             for(int s=0;s<nsample;s++){
               if(nsample>1) if(master) cout <<"Sample #" << s+1 << ": \n";
-              dev+=cl_dlr(ra,av[s],lambda[k],th[s],q_qi);
+              dev+=cl_dlr(ra,av[s],para[k],th[s],q_qi);
             }
           if(master) cout << "Collective likelihood ratio statistic: " << dev << endl;
           double df=nsample*(L*nsig+L*L*nsig*(nsig-1)/2);
@@ -872,9 +888,9 @@ void cl_inf(vector<vector<vector<short> > > &ai,const vector<vector<int> > &nptr
         if(master){
           cout << "Mean p-value: " << exp(lnp) << endl;
           if(!q_mf)
-            cout << "lambda = (" << Lh << ", " << lambda[k] << ")\n";
+            cout << "lambda = (" << Lh << ", " << para[k] << ")\n";
           else
-            cout << "epsilon = " << eps<< endl;
+            cout << "epsilon = " << para[k]<< endl;
         }
         sort(risk.begin(),risk.end(),comp);
         roc(risk);
@@ -897,12 +913,12 @@ void cl_inf(vector<vector<vector<short> > > &ai,const vector<vector<int> > &nptr
   double dev=0;
   void par_out(ofstream &of,const vector<string> &ra,double dev,int nsig,
       const vector<vector<vector<vector<short> > > > &aw,Theta *th);
-  for(unsigned int k=0;k<lambda.size();k++){
+  for(unsigned int k=0;k<para.size();k++){
     if(q_ee || q_mf || q_pl)
-      dev=cl_gdi(aw,q_qi,ra,lambda[k],nptr,th);  // GDI
+      dev=cl_gdi(aw,q_qi,ra,para[k],nptr,th);  // GDI
     else
       for(int s=0;s<nsample;s++)
-        dev+=cl_dlr(ra,aw[s],lambda[k],th[s],q_qi);  // LR
+        dev+=cl_dlr(ra,aw[s],para[k],th[s],q_qi);  // LR
     if(master) par_out(of,ra,dev,nsig,aw,th);
   }
   if(master) of.close();
@@ -1012,6 +1028,7 @@ void snp_select(const vector<vector<vector<short> > > &ai,int nv,
 
   for(int i=0;i<nsnp;i++){
     double qtot=0;
+    int nscount=0;
     for(int s=0;s<nsample;s++){
       double fr1[2][2]={{0,}};
       int nmiss[2]={0,};
@@ -1032,14 +1049,14 @@ void snp_select(const vector<vector<vector<short> > > &ai,int nv,
       double q=0;
       double alpha0=0;
       double beta0[2]={0,};
-      if(pcut<1){
-        nna=assoc(fr1,nmiss,q,alpha0,beta0);
-        if(!nna) break;
+      nna=assoc(fr1,nmiss,q,alpha0,beta0);
+      if(nna){ 
+        nscount++;
+        qtot+=q;
       }
-      qtot+=q;
     }
-    if(!nna) continue;
-    double df=L*nsample;
+    if(nscount==0) continue;
+    double df=L*nscount;
     double pv= (qtot>0 ? gsl_sf_gamma_inc_Q(0.5*df,qtot/2) : 1);   // DOM or REC
     if(pv>pcut) continue;
     slist.push_back(i);
@@ -1123,7 +1140,7 @@ double cl_gdi(const vector<vector<vector<vector<short> > > > &ai,bool q_qi,
     if(master) cout << "DDA inference with lambda = (" << Lh << ", " << lambda << ")\n";
   }
   else if(q_mf)
-    if(master) cout << "DDA inference with epsilon = " << eps << endl;
+    if(master) cout << "DDA inference with epsilon = " << lambda << endl;
 
   double lnz[3]={0,};
   for(int s=0;s<nsample;s++){  // loop over samples
@@ -1142,12 +1159,13 @@ double cl_gdi(const vector<vector<vector<vector<short> > > > &ai,bool q_qi,
           lnz[y]=log(z[y]);
         }
         else
-          lks+=invC(nind[y],f1[s][y],f2[s][y],lnz[y],h[s][y],J[s][y]);   // MFA (returns Hy/n)
+          lks+=invC(nind[y],f1[s][y],f2[s][y],lnz[y],h[s][y],J[s][y],lambda); 
+                   // MFA (returns Hy/n)
       }
       if(q_ee)
         qtot+=2*(lks-lpr(2,ai[s],f1[s][2],f2[s][2],lambda,z,h[s][2],J[s][2],-1,-1,s));
       else   // MFA
-        qtot+=2*(lks-invC(nind[0]+nind[1],f1[s][2],f2[s][2],lnz[2],h[s][2],J[s][2]));
+        qtot+=2*(lks-invC(nind[0]+nind[1],f1[s][2],f2[s][2],lnz[2],h[s][2],J[s][2],lambda));
       lkl+=lks;
     }
     else{                           // pseudo-L
@@ -2167,12 +2185,27 @@ double q2p(double x,int k){
 }
 
 double invC(int nind,const vector<vector<double> > &f1,const vector<vector<vector<double> > > &f2,
-    double &lnz,vector<vector<double> > &h,vector<vector<vector<double> > > &J){
+    double &lnz,vector<vector<double> > &h,vector<vector<vector<double> > > &J,double eps){
 
   int nsnp=f1.size();
-  gsl_matrix *A=gsl_matrix_alloc(nsnp*L,nsnp*L);
-  gsl_matrix *Ai=gsl_matrix_alloc(nsnp*L,nsnp*L);
-  gsl_permutation *perm=gsl_permutation_alloc(nsnp*L);
+  int ndim=nsnp*L;
+
+  gsl_matrix *A;
+  gsl_matrix *Ai;
+  gsl_permutation *perm;
+
+#ifdef MPIP
+  double *mat;
+  if(q_mfp)
+    mat=new double[ndim*ndim];      // parallel version using scaLAPACK
+  else{
+#endif
+    A=gsl_matrix_alloc(ndim,ndim);   // serial version using GSL
+    Ai=gsl_matrix_alloc(ndim,ndim);
+    perm=gsl_permutation_alloc(ndim);
+#ifdef MPIP
+  }
+#endif
 
   double tr=0;
   for(int i=0;i<nsnp;i++) for(int l=0;l<L;l++)
@@ -2182,15 +2215,30 @@ double invC(int nind,const vector<vector<double> > &f1,const vector<vector<vecto
   for(int i=0;i<nsnp;i++) for(int l0=0;l0<L;l0++)
     for(int j=0;j<nsnp;j++) for(int l1=0;l1<L;l1++){
     double x=eps*(f2[i][j][2*l0+l1]-f1[i][l0]*f1[j][l1]);
-    if(i==j && l0==l1) 
-//    x+=(1-eps)*f1[i]*(1-f1[i]);
+    if(i==j && l0==l1){ 
       x+=(1-eps)*tr;
-    gsl_matrix_set(A,i*L+l0,j*L+l1,x);
+    }
+#ifdef MPIP
+    if(q_mfp)
+      mat[(i*L+l0)*ndim+j*L+l1]=x;
+    else
+#endif
+      gsl_matrix_set(A,i*L+l0,j*L+l1,x);
   }
 
-  int s;
-  gsl_linalg_LU_decomp(A,perm,&s);
-  gsl_linalg_LU_invert(A,perm,Ai);
+#ifdef MPIP
+  if(q_mfp){
+    int nb=Nb;
+    invrs_(mat,&ndim,&nb,&nproc,&rank);   // A -> A^{-1} via scaLAPACK 
+  }
+  else{
+#endif
+    int s;
+    gsl_linalg_LU_decomp(A,perm,&s);
+    gsl_linalg_LU_invert(A,perm,Ai);
+#ifdef MPIP
+  }
+#endif
 
   h.resize(nsnp);
   J.resize(nsnp);
@@ -2204,7 +2252,13 @@ double invC(int nind,const vector<vector<double> > &f1,const vector<vector<vecto
       lnz+=-log(1-f1[i][l0]);
       for(int j=0;j<nsnp;j++) for(int l1=0;l1<L;l1++){
         if(i==j) continue;
-        double x=gsl_matrix_get(Ai,L*i+l0,L*j+l1);
+        double x=0;
+#ifdef MPIP
+        if(q_mfp)
+          x=mat[(L*i+l0)*ndim+L*j+l1];
+        else
+#endif
+          x=gsl_matrix_get(Ai,L*i+l0,L*j+l1);
         J[i][j][2*l0+l1]=-x;
         f+=x*f1[j][l1];
         lnz+=0.5*x*f1[i][l1]*f1[j][l1];
@@ -2213,9 +2267,17 @@ double invC(int nind,const vector<vector<double> > &f1,const vector<vector<vecto
     }
   }
 
-  gsl_matrix_free(A);
-  gsl_matrix_free(Ai);
-  gsl_permutation_free(perm);
+#ifdef MPIP
+  if(q_mfp)
+    delete []mat;
+  else{
+#endif
+    gsl_matrix_free(A);
+    gsl_matrix_free(Ai);
+    gsl_permutation_free(perm);
+#ifdef MPIP
+  }
+#endif
 
   double Lk=0;
   for(int i=0;i<nsnp;i++) for(int l0=0;l0<L;l0++){

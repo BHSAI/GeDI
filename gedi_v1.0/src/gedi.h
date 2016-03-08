@@ -73,7 +73,8 @@ double lpr_psl(int i0,int cc,const std::vector<std::vector<std::vector<short> > 
 
 double invC(int nind,const std::vector<std::vector<double> > &f1,
     const std::vector<std::vector<std::vector<double> > > &f2,double &lnz,
-    std::vector<std::vector<double> > &h,std::vector<std::vector<std::vector<double> > > &J);
+    std::vector<std::vector<double> > &h,std::vector<std::vector<std::vector<double> > > &J,
+    double epsilon);
 
 void f12(int cc,const std::vector<std::vector<std::vector<short> > > &ai,std::vector<std::vector<double> > &f1,
     std::vector<std::vector<std::vector<double> > > &f2);

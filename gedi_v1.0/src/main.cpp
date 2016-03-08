@@ -18,6 +18,9 @@ bool q_minor_ctl=false;    // true if minor allele is wrt control group
 bool q_cv=false;           // true if cross-validation
 bool q_ee=false;           // flag for exact enumeration
 bool q_mf=false;           // flag for mean field
+#ifdef MPIP
+bool q_mfp=false;          // flag for mean field (parallel)
+#endif
 bool q_pl=false;           // flag for pseudolikelihood
 bool q_vbs=false;          // foag for being verbose
 bool q_meta=false;         // flag for meta-analysis
@@ -31,7 +34,7 @@ string excl_file="";       // snp exclusion list file
 double pcut=-1;            // p-value cutoff for cross-validation
 double tol=1.0e-5;         // iteration tolerance
 vector<double> lambda;     // penalizer
-double eps=0.1;            // regularizer (MFA)
+vector<double> eps;        // MFA regularizer
 double Prev=-1;            // disease prevalence
 double Lh=0;               // penalizer for h
 unsigned int imax=10000;    // maximum no. of iteration
@@ -105,6 +108,7 @@ int main(int argc,char* argv[]){
    bool q_qi=false;          // flag for CL marginal p-value calculation
 
    lambda.push_back(0.1);    // default lambda
+   eps.push_back(0.1);       // default epsilon
 
    string tped_file,tfam_file,par_file,meta_file;
    string out_file="gedi.out";   // default output
@@ -167,6 +171,12 @@ int main(int argc,char* argv[]){
          q_pl=true;
        else if(flag=="mf")
          q_mf=true;
+#ifdef MPIP
+       else if(flag=="mfp"){
+         q_mfp=true;
+         q_mf=true;
+       }
+#endif
        else if(flag=="dump")
          q_dump=true;
        else if(flag=="boot"){
@@ -222,6 +232,19 @@ int main(int argc,char* argv[]){
            if(i==argc) break;
          }
        }
+       else if(flag=="eps"){
+         string nu;
+         eps.resize(0);
+         while(1){
+           nu=argv[i++];
+           if(nu.substr(0,1)=="-"){
+             i--;
+             break;
+           }
+           eps.push_back(atof(nu.c_str()));
+           if(i==argc) break;
+         }
+       }
        else if(flag=="lh")
          Lh=atof(argv[i++]);
        else if(flag=="meta"){
@@ -245,8 +268,6 @@ int main(int argc,char* argv[]){
          ncv=atoi(argv[i++]);
        else if(flag=="pcut")
          pcut=atof(argv[i++]);
-       else if(flag=="eps")
-         eps=atof(argv[i++]);
        else if(flag=="bfile")
          bfile=argv[i++];      // binary data file prefix
        else if(flag=="chr")
@@ -388,8 +409,15 @@ int main(int argc,char* argv[]){
          if(master) cout << "Exact enumeration\n\n";
        }
        else if(q_mf){
-         if(master) cout << "Mean field\n\n";
-         if(eps<0 || eps>1){
+         if(master){
+#ifdef MPIP
+           if(q_mfp)
+             cout << "Mean field (parallel)\n\n";
+           else
+#endif
+             cout << "Mean field\n\n";
+         }
+         if(eps[0]<0 || eps[0]>1){
            if(master) cerr << "epsilon must be between 0 and 1. Bye!\n";
            end();
          }

@@ -222,8 +222,8 @@ void il_bed(string &meta,string &out_file,bool q_lr){
     double qtot=0;
     char minor,major,rsk;
     int nmist[2]={0,};
-    bool nnat=true;
     double teff=0;
+    int nscount=0;
     for(int s=0;s<nsample;s++){
       int ncase=nptr[s+1][1]-nptr[s][1];
       int nctrl=nptr[s+1][0]-nptr[s][0];
@@ -231,7 +231,6 @@ void il_bed(string &meta,string &out_file,bool q_lr){
       int nsize=ncase+nctrl;
       int nbyte=ceil(nsize/4.);              // no. of bytes for each snp
       double neff=2.0/sqrt(1.0/ncase+1.0/nctrl);  // effective sample size weight
-      teff+=neff;
       char *data=new char[nbyte];
       string gi0="";
       string gi1="";
@@ -302,18 +301,24 @@ void il_bed(string &meta,string &out_file,bool q_lr){
            nna=il_dlr(q,alp,bet,ani); 
         }
       }
-      qtot+=q;
-      nnat=nnat && nna;
-      alpha+=alp*neff;
-      beta[0]+=bet[0]*neff;
-      beta[1]+=bet[1]*neff;
-      nmist[0]+=nmiss[0];
-      nmist[1]+=nmiss[1];
+      if(nna){
+        qtot+=q;
+        alpha+=alp*neff;
+        beta[0]+=bet[0]*neff;
+        beta[1]+=bet[1]*neff;
+        nmist[0]+=nmiss[0];
+        nmist[1]+=nmiss[1];
+        teff+=neff;
+        nscount++;
+      }
     } // end of sample loop
-    alpha/=teff;
-    beta[0]/=teff;
-    beta[1]/=teff;
-    il_stat(of,nchr[i],rs[i],pos[i],minor,nmist,nnat,qtot,nsample,alpha,beta);
+    bool nnat=nscount>0;
+    if(nnat){
+      alpha/=teff;
+      beta[0]/=teff;
+      beta[1]/=teff;
+    }
+    il_stat(of,nchr[i],rs[i],pos[i],minor,nmist,nnat,qtot,nscount,alpha,beta);
   }  // end of snp loop
 
   if(master) cout << nsnp << " snps analyzed\n\n";
@@ -449,8 +454,8 @@ void il_tped(string &tped,string &tfam,string &meta_file,string &out_file,bool q
      int nchr;
      double qtot=0;
      int nmist[2]={0,}; // no. of non-missing individuals
-     bool nnat=true;
      double teff=0;
+     int nscount=0;
      while(1){             // loop over samples
        gi0="";
        gi1="";
@@ -477,7 +482,6 @@ void il_tped(string &tped,string &tfam,string &meta_file,string &out_file,bool q
        unsigned int nctrl=nptr[s+1][0]-nptr[s][0];
        unsigned int nsize=ncase+nctrl;
        double neff=2.0/sqrt(1.0/ncase+1.0/nctrl);
-       teff+=neff;
        if(gi0.size()!=nsize){
          if(master)
            cerr << " Genotype data in " << mtped[s] << " do not match " << mtfam[s] << endl;
@@ -523,25 +527,31 @@ void il_tped(string &tped,string &tfam,string &meta_file,string &out_file,bool q
            nna=il_dlr(q,alp,bet,ani); 
          }
        }
-       nnat=nnat && nna;
-       qtot+=q;
-       alpha+=alp*neff;
-       beta[0]+=bet[0]*neff;
-       beta[1]+=bet[1]*neff;
-       nmist[0]+=nmiss[0];
-       nmist[1]+=nmiss[1];
+       if(nna){
+         qtot+=q;
+         teff+=neff;
+         alpha+=alp*neff;
+         beta[0]+=bet[0]*neff;
+         beta[1]+=bet[1]*neff;
+         nmist[0]+=nmiss[0];
+         nmist[1]+=nmiss[1];
+         nscount++;
+       }
        if(++s==nsample) break;
        getline(f0[s],line);
      }
-     alpha/=teff;
-     beta[0]/=teff;
-     beta[1]/=teff;
+     bool nnat=nscount>0;
+     if(nnat){
+       alpha/=teff;
+       beta[0]/=teff;
+       beta[1]/=teff;
+     }
      if(master){
        if(nsnp>Npr && nsnp%Npr==0) 
          cout << "inferring parameters for " << nsnp << "'th SNP:\n";
      }
      nsnp++;
-     il_stat(of,nchr,rsn[0],pos,minor,nmist,nnat,qtot,nsample,alpha,beta);
+     il_stat(of,nchr,rsn[0],pos,minor,nmist,nnat,qtot,nscount,alpha,beta);
    }
    if(master) cout << nsnp << " snps analyzed\n\n";
 
@@ -564,7 +574,8 @@ void header(ofstream& of,int nind[2]){
    else
       of << setw(11) << "OR" << "  ";
    of << setw(11) << "q" << "  ";
-   of << setw(11) << "p-value" << " ";
+   of << setw(4) << "df" << "  ";
+   of << setw(11) << "P" << " ";
    double pd=double(nind[1])/(nind[0]+nind[1]);
    of << "Pd: " <<  pd << endl;
 }
@@ -588,9 +599,12 @@ void il_stat(ofstream& of,int nchr,string &rsn,int pos,char minor,int nmiss[],bo
          of << setw(11) << eb << "  ";
        }
        of << setw(11) << q << "  ";
+       int df=L*nsample;
+       of << setw(4) << df << "  ";
        double p=1.0;
        if(q>0)
-         p=gsl_sf_gamma_inc_Q(0.5*L*nsample,q/2);      
+//       p=gsl_sf_gamma_inc_Q(0.5*L*nsample,q/2);
+         p=gsl_sf_gamma_inc_Q(0.5*df,q/2);
        of << setw(11) << left << p << endl;
      }
      else{                           // bad statistics
@@ -898,36 +912,18 @@ void read_par(ifstream &prf,double &alpha,vector<double> &beta1,vector<double> &
 }
 
 void pr(ofstream &of,const vector<vector<vector<vector<short> > > > &ai,
-    const vector<double> &alpha,const vector<vector<double> > &beta1,
-    const vector<vector<double> > &beta2,const vector<double> &pv,vector<vector<double> > &risk){
+    double &alpha,const vector<double> &beta1,
+    const vector<double> &beta2,const vector<double> &pv,vector<vector<double> > &risk){
 
   int nsample=ai.size();
   int nsnp=ai[0][0][0].size();
   int msnp=0;
-  double alp=0;
-  vector<double> bet1(nsnp),bet2(nsnp);
-
-  double teff=0;
-  for(int s=0;s<nsample;s++){
-    double neff=2.0/sqrt(1.0/ai[s][0].size()+1.0/ai[s][1].size());
-    alp+=alpha[s]*neff;
-    teff+=neff;
-    for(int i=0;i<nsnp;i++){
-      bet1[i]+=beta1[s][i]*neff;
-      bet2[i]+=beta2[s][i]*neff;
-    }
-  }
-  alp/=teff;
-  for(int i=0;i<nsnp;i++){
-    bet1[i]/=teff;
-    bet2[i]/=teff;
-  }
 
   for(int s=0;s<nsample;s++){
     int nind[2]={int(ai[s][0].size()),int(ai[s][1].size())};
     int nsnp=ai[s][0][0].size();
     for(int y=0;y<2;y++) for(int n=0;n<nind[y];n++){
-      double h=alp;
+      double h=alpha;
       msnp=0;
       for(int i=0;i<nsnp;i++){
         if(!q_cv){
@@ -937,16 +933,16 @@ void pr(ofstream &of,const vector<vector<vector<vector<short> > > > &ai,
         int a=ai[s][y][n][i];
         switch(model){
           case DOM:
-            h+=(a==1 || a==2)*bet1[i];
+            h+=(a==1 || a==2)*beta1[i];
             break;
           case REC:
-            h+=(a==2)*bet1[i];
+            h+=(a==2)*beta1[i];
             break;
           case GEN:
-            h+=(a==1)*bet1[i]+(a==2)*bet2[i];
+            h+=(a==1)*beta1[i]+(a==2)*beta2[i];
             break;
           case ADD:
-            if(a>0) h+=a*bet1[i];
+            if(a>0) h+=a*beta1[i];
             break;
           default:
             estop(19);
@@ -1213,9 +1209,9 @@ void pr_tped(string &tped,string &tfam,string &meta_file,string &par_file,string
    of.open(out_file.c_str(),ios::out);
    ifstream prf;
 
-   vector<double> alpha(nsample);
-   vector<vector<double> > beta1(nsample);
-   vector<vector<double> > beta2(nsample);
+   double alpha=0;
+   vector<double> beta1;
+   vector<double> beta2;
    vector<double> pv;                 // p-values
    if(pcut<0)                         // p-value cutoff not specified
      pcut=0.05/nsnp;                  // Bonferroni
@@ -1223,7 +1219,7 @@ void pr_tped(string &tped,string &tfam,string &meta_file,string &par_file,string
    void snp_select_il(const vector<vector<vector<short> > > &ai,int nv,
     vector<vector<vector<vector<short> > > > &av,vector<vector<vector<vector<short> > > > &aw,
     const vector<string> &rs,vector<string> &ra,const vector<vector<int> > &nptr,
-    vector<double> &alpha,vector<vector<double> > &beta1,vector<vector<double> > &beta2);
+    double &alpha,vector<double> &beta1,vector<double> &beta2);
 
    vector<vector<double> > risk;      // (risk,y)
    double mav=0;
@@ -1266,10 +1262,10 @@ void pr_tped(string &tped,string &tfam,string &meta_file,string &par_file,string
        if(master) cerr << "IL prediction using parameter file cannot use meta-analysis. Bye!\n";
        end();
      }
-     beta1[0].resize(nsnp);
+     beta1.resize(nsnp);
      pv.resize(nsnp);
-     if(model==GEN) beta2[0].resize(nsnp);
-     read_par(prf,alpha[0],beta1[0],beta2[0],pv);   // read parameters
+     if(model==GEN) beta2.resize(nsnp);
+     read_par(prf,alpha,beta1,beta2,pv);   // read parameters
      prf.close();
      vector<vector<vector<vector<short> > > > aw(1);
      aw[0]=ai;
@@ -1404,9 +1400,9 @@ void il_bpr(string &meta_file,string &out_file,string &par_file,bool q_lr){
   of.open(out_file.c_str(),ios::out);
   ifstream prf;
 
-  vector<double> alpha(nsample);
-  vector<vector<double> > beta1(nsample);
-  vector<vector<double> > beta2(nsample);
+  double  alpha=0;
+  vector<double> beta1;
+  vector<double> beta2;
   vector<double> pv;                 // p-values
   if(pcut<0)                         // p-value cutoff not specified
     pcut=0.05/nsnp;                  // Bonferroni
@@ -1414,7 +1410,7 @@ void il_bpr(string &meta_file,string &out_file,string &par_file,bool q_lr){
   void snp_select_il(const vector<vector<vector<short> > > &ai,int nv,
     vector<vector<vector<vector<short> > > > &av,vector<vector<vector<vector<short> > > > &aw,
     const vector<string> &rs,vector<string> &ra,const vector<vector<int> > &nptr,
-    vector<double> &alpha,vector<vector<double> > &beta1,vector<vector<double> > &beta2);
+    double &alpha,vector<double> &beta1,vector<double> &beta2);
 
   vector<vector<double> > risk;      // (risk,y)
   if(q_cv){
@@ -1456,10 +1452,10 @@ void il_bpr(string &meta_file,string &out_file,string &par_file,bool q_lr){
        if(master) cerr << "IL prediction using parameter file cannot use meta-analysis. Bye!\n";
        end();
      }
-     beta1[0].resize(nsnp);
+     beta1.resize(nsnp);
      pv.resize(nsnp);
-     if(model==GEN) beta2[0].resize(nsnp);
-     read_par(prf,alpha[0],beta1[0],beta2[0],pv);   // read parameters
+     if(model==GEN) beta2.resize(nsnp);
+     read_par(prf,alpha,beta1,beta2,pv);   // read parameters
      prf.close();
      vector<vector<vector<vector<short> > > > aw(1);
      aw[0]=ai;
@@ -1489,7 +1485,7 @@ void tped_out(ofstream &qcout,int nchr,string &rsn,string &fid,int pos,string &g
 void snp_select_il(const vector<vector<vector<short> > > &ai,int nv,
   vector<vector<vector<vector<short> > > > &av,vector<vector<vector<vector<short> > > > &aw,
   const vector<string> &rs,vector<string> &ra,const vector<vector<int> > &nptr,
-    vector<double> &alpha,vector<vector<double> > &beta1,vector<vector<double> > &beta2){
+    double &alpha,vector<double> &beta1,vector<double> &beta2){
 
   int nsnp=ai[0][0].size();
   int nsample=nptr.size()-1;
@@ -1497,17 +1493,16 @@ void snp_select_il(const vector<vector<vector<short> > > &ai,int nv,
   int nsig=0;
   vector<int> slist;
   vector<vector<int> > nc(nsample);   // nc[s][y]=size of training set in sample s and y
-  for(int s=0;s<nsample;s++){
-    alpha[s]=0;
-    beta1[s].resize(0);
-    beta2[s].resize(0);
-  }
 
+  alpha=0;
+  beta1.resize(0);
+  beta2.resize(0);
   for(int i=0;i<nsnp;i++){
     double qtot=0;
-    vector<double>alp(nsample);
-    vector<double>bet0(nsample);
-    vector<double>bet1(nsample);
+    double teff=0;
+    double alps=0;
+    double bets[2]={0,};
+    int nscount=0;
     for(int s=0;s<nsample;s++){
       double fr1[2][2]={{0,}};
       int nmiss[2]={0,};
@@ -1529,30 +1524,44 @@ void snp_select_il(const vector<vector<vector<short> > > &ai,int nv,
         fr1[y][1]/=nmiss[y];
       }
       double q=0;
+      double alp=0;
       double bet[2]={0,};
-      nna=assoc(fr1,nmiss,q,alp[s],bet);
-      if(!nna) break;
-      qtot+=q;
-      bet0[s]=bet[0];
-      bet1[s]=bet[1];
+      nna=assoc(fr1,nmiss,q,alp,bet);
+      if(nna){
+        int ncase=nptr[s+1][1]-nptr[s][1];
+        int nctrl=nptr[s+1][0]-nptr[s][0];
+        double neff=2.0/sqrt(1.0/ncase+1.0/nctrl);  // effective sample size weight
+        teff+=neff;
+        qtot+=q;
+        alps+=alp*neff;
+        bets[0]+=bet[0]*neff;
+        bets[1]+=bet[1]*neff;
+        nscount++;
+      }
     }
-    if(!nna) continue;
-    double df=L*nsample;
+    if(nscount==0) continue;
+    bets[0]/=teff;
+    bets[1]/=teff;
+    double df=L*nscount;
     double pv= (qtot>0 ? gsl_sf_gamma_inc_Q(0.5*df,qtot/2) : 1);   // DOM or REC
     if(pv>pcut) continue;
+    alpha+=alps/teff;
+    beta1.push_back(bets[0]);
+    beta2.push_back(bets[1]);
     slist.push_back(i);
     ra.push_back(rs[i]);
-    for(int s=0;s<nsample;s++){
-      alpha[s]+=alp[s];
-      beta1[s].push_back(bet0[s]);
-      beta2[s].push_back(bet1[s]);
-    }
     nsig++;
   }
 
+  double da=0;
+  double teff=0;
   for(int s=0;s<nsample;s++){
+    int ncase=nptr[s+1][1]-nptr[s][1];
+    int nctrl=nptr[s+1][0]-nptr[s][0];
+    double neff=2.0/sqrt(1.0/ncase+1.0/nctrl);  // effective sample size weight
     double prev=double(nc[s][1])/(nc[s][0]+nc[s][1]);
-    alpha[s]+=log(prev/(1-prev));
+    da+=log(prev/(1-prev))*neff;
+    teff+=neff;
     av[s].resize(2);
     aw[s].resize(2);
     for(int y=0;y<2;y++){ 
@@ -1571,4 +1580,5 @@ void snp_select_il(const vector<vector<vector<short> > > &ai,int nv,
       }
     }
   }
+  alpha+=da/teff;
 }
