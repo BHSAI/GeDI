@@ -21,10 +21,10 @@
 !  variables for definition of matrix A and matrix X
 !  local variables
       real*8    al(max_al), bl(max_bl), rl(max_bl)
-      real*8    ai(max_bl),ainv(max_bl)
+      real*8    ai(max_bl)
       integer   ctxt, ctxt_sys, ctxt_all, 
      :          nprow, npcol, myrow, mycol,
-     :          m_al, n_al, m_bl, n_bl,
+     :          m_al, n_al, m_bl, n_bl, m_cl, 
      :          llda, lldb, lldc, desc_A(9), desc_B(9),
      :          ncheck, k,l,
      :          irhs, ipr, ipc, il, jl, i, j, info, vl(max_vl),  
@@ -55,8 +55,7 @@
       n_bl = NUMROC( n, nb, mycol, 0, npcol )
 !     write(*,*)myid,nprow,npcol
 !     write(*,*)myid,myrow,mycol,m_al,n_al,m_bl,n_bl
-!     call BLACS_EXIT(1)
-!     stop
+!     call BLACS_EXIT(1); stop
 ! Test for sufficient memory
       if (m_al*n_al.gt.max_al.or.m_bl*n_bl.gt.max_bl) then
         write(6,*)'not enough memory:  al ',m_al*n_al,max_al,
@@ -66,7 +65,7 @@
       end if 
 
 ! initializing descriptors for the distributed matrices A, B:
-      llda = max(1,m_al); lldb = max(1,m_bl)
+      llda = max(1,m_al); lldb = max(1,m_bl); lldc = max(1,m_cl)
       call DESCINIT( desc_A, n, n, nb, nb,0,0, ctxt, llda, info )
       call DESCINIT( desc_B, n, n, nb, nb,0,0, ctxt, lldb, info )
 
@@ -111,9 +110,9 @@
               do il=1,m_bl
                 k = INDXL2G(il,nb,i,0,nprow)
                 if(i.eq.0.and.j.eq.0) then
-                  ainv(l+(k-1)*n)=bl(il+m_bl*(jl-1))
+                  mat(l+(k-1)*n)=bl(il+m_bl*(jl-1))
                 else
-                  ainv(l+(k-1)*n)=ai(il+m_bl*(jl-1))
+                  mat(l+(k-1)*n)=ai(il+m_bl*(jl-1))
                 endif
               enddo
             enddo
@@ -129,12 +128,6 @@
         call dgesd2d(ctxt,m_bl,n_bl,bl,m_bl,0,0)
 !       write(*,*)'sent',myid
       endif
-
-      do j=1,n
-        do i=1,n
-          mat((j-1)*N+i)=ainv((j-1)*n+i)
-        enddo
-      enddo
 
  1000 continue
       end
