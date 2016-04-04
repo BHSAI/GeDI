@@ -928,34 +928,64 @@ void cl_inf(vector<vector<vector<short> > > &ai,const vector<vector<int> > &nptr
 void par_out(ofstream &of,const vector<string> &rs,double dev,int nsig,
     const vector<vector<vector<vector<short> > > > &aw,Theta *th){
 
-  if(master) cout << "Collective likelihood ratio statistic: " << dev << endl;
+  cout << "Collective likelihood ratio statistic: " << dev << endl;
   int nsample=aw.size();
 //double df=nsample*nsig*(nsig+1)/2;
   double df=nsample*(L*nsig+L*L*nsig*(nsig-1)/2);
-  if(master) cout << "Degrees of freedom: " << df << endl;
+  cout << "Degrees of freedom: " << df << endl;
   double lnp= (dev>=0 ? gsl_sf_gamma_inc_Q(0.5*df,dev/2) : 1 );
-  if(master) cout << "p-value: " << lnp << endl << endl;
+  cout << "p-value: " << lnp << endl << endl;
 
+  double alpha=0;
+  double Pd=0;
+  int nsnp=aw[0][0][0].size();
+  vector<vector<double> > beta(nsnp);
+  vector<vector<vector<double> > > gamm(nsnp);
+  for(int i=0;i<nsnp;i++){
+    beta[i].resize(L);
+    gamm[i].resize(nsnp);
+    for(int j=0;j<nsnp;j++) gamm[i][j].resize(L*L);
+  }
+  double teff=0;
   for(int s=0;s<nsample;s++){
+    vector<vector<double> > f1;
+    vector<vector<vector<double> > > f2;
+    for(int y=0;y<2;y++) f12(y,aw[s],f1,f2);              // calculate mean frqs
     int nind[2]={int(aw[s][0].size()),int(aw[s][1].size())};
-    double Pd=double(nind[1])/(nind[0]+nind[1]); // disease prevalence
-    of << "alpha: " << setw(12) << th[s].alpha << " Pd: " << setw(12) << Pd << endl;
-    for(int i=0;i<nsig;i++) for(int l0=0;l0<L;l0++){
-      of << left;
-      of << setw(15) << rs[i] << " ";
-      of << right;
-      for(int j=0;j<i;j++) for(int l1=0;l1<L;l1++)
-        of << setw(11) << th[s].gamm[i][j][2*l0+l1] << " ";
-      for(int l1=0;l1<L;l1++){
-        if(l0==l1)
-          of << setw(11) << th[s].beta[i][l0] << " ";
-        else
-          of << setw(11) << 0 << " ";
-      }
-      for(int j=i+1;j<nsig;j++) for(int l1=0;l1<L;l1++)
-        of << setw(11) << th[s].gamm[i][j][2*l0+l1] << " ";
-      of << endl;
+    double neff=2.0/sqrt(1.0/nind[0]+1.0/nind[1]);
+    alpha+=th[s].alpha*neff;
+    Pd+=double(nind[1])/(nind[0]+nind[1])*neff;
+    for(int i=0;i<nsnp;i++) for(int l1=0;l1<L;l1++){
+      beta[i][l1]+=th[s].beta[i][l1]*neff;
+      for(int j=0;j<nsnp;j++) for(int l2=0;l2<L;l2++)
+        gamm[i][j][2*l1+l2]+=th[s].gamm[i][j][2*l1+l2]*neff;
     }
+    teff+=neff;
+  }
+  alpha/=teff;
+  Pd/=teff;
+  for(int i=0;i<nsnp;i++) for(int l1=0;l1<L;l1++){
+    beta[i][l1]/=teff;
+    for(int j=0;j<nsnp;j++) for(int l2=0;l2<L;l2++)
+      gamm[i][j][2*l1+l2]/=teff;
+  }
+
+  of << "alpha: " << setw(12) << alpha << " Pd: " << setw(12) << Pd << endl;
+  for(int i=0;i<nsig;i++) for(int l0=0;l0<L;l0++){
+    of << left;
+    of << setw(15) << rs[i] << " ";
+    of << right;
+    for(int j=0;j<i;j++) for(int l1=0;l1<L;l1++)
+      of << setw(11) << gamm[i][j][2*l0+l1] << " ";
+    for(int l1=0;l1<L;l1++){
+      if(l0==l1)
+        of << setw(11) << beta[i][l0] << " ";
+      else
+        of << setw(11) << 0 << " ";
+    }
+    for(int j=i+1;j<nsig;j++) for(int l1=0;l1<L;l1++)
+      of << setw(11) << gamm[i][j][2*l0+l1] << " ";
+    of << endl;
   }
 }
 
