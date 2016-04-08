@@ -48,6 +48,7 @@ extern bool q_marg;      // true if marginal calculation
 extern bool q_pi;        // true if single-locus p-value
 extern bool q_pij;       // true if interaction p-value
 extern bool q_qij;       // true if interaction LR statistic
+extern bool q_pout;      // true if p-value output
 extern int ncv;
 extern string excl_file; // snp exclusion list
 extern int nproc;        // no. of processors
@@ -820,7 +821,7 @@ void cl_inf(vector<vector<vector<short> > > &ai,const vector<vector<int> > &nptr
   if(pcut<0)
     pcut=0.05/nsnp;
 
-  ofstream of;
+  ofstream of,ocv;
   if(master) of.open(out_file.c_str(),ios::out);
 
   vector<vector<double> > risk;                  // (risk,y) 
@@ -833,14 +834,15 @@ void cl_inf(vector<vector<vector<short> > > &ai,const vector<vector<int> > &nptr
     para=lambda;
 
   bool comp(vector<double> a,vector<double> b);
-  void roc(vector<vector<double> > &risk);
+  void roc(ofstream &ocv,vector<vector<double> > &risk);
   if(q_pr){         // prediction mode
+    if(master) ocv.open("gedi.auc",ios::out);
     if(!q_cv){
       vector<vector<vector<vector<short> > > > av(1);   // genotype subset from snps in parameter file
       read_par_cl(ai,par,av[0],rs,th[0]);        // read parameters
       pr_cl(of,av,th,risk);                // do prediction
       sort(risk.begin(),risk.end(),comp);
-      roc(risk);
+      roc(ocv,risk);
     }
     else{
       for(unsigned int k=0;k<para.size();k++){
@@ -875,27 +877,34 @@ void cl_inf(vector<vector<vector<short> > > &ai,const vector<vector<int> > &nptr
               dev+=cl_dlr(ra,av[s],para[k],th[s],q_qi);
             }
           if(master) cout << "Collective likelihood ratio statistic: " << dev << endl;
-          double df=nsample*(L*nsig+L*L*nsig*(nsig-1)/2);
-          if(master) cout << "Degrees of freedom: " << df << endl;
-          double p= (dev>=0 ? gsl_sf_gamma_inc_Q(0.5*df,dev/2) : 1 );
-          if(master) cout << "p-value: " << p << endl << endl;
-          lnp+=log(p);
+          if(q_pout){
+            double df=nsample*(L*nsig+L*L*nsig*(nsig-1)/2);
+            if(master) cout << "Degrees of freedom: " << df << endl;
+            double p= (dev>=0 ? gsl_sf_gamma_inc_Q(0.5*df,dev/2) : 1 );
+            if(master) cout << "p-value: " << p << endl << endl;
+            lnp+=log(p);
+          }
           pr_cl(of,aw,th,risk);
         }
         s/=ncv;
         if(master) cout << "Mean SNP number: " << s << endl;
         lnp/=ncv;
         if(master){
-          cout << "Mean p-value: " << exp(lnp) << endl;
-          if(!q_mf)
+          if(q_pout) cout << "Mean p-value: " << exp(lnp) << endl;
+          if(!q_mf){
             cout << "lambda = (" << Lh << ", " << para[k] << ")\n";
-          else
+            ocv << Lh << " " << para[k] << " ";
+          }
+          else{
             cout << "epsilon = " << para[k]<< endl;
+            ocv << para[k] << " ";
+          }
         }
         sort(risk.begin(),risk.end(),comp);
-        roc(risk);
+        roc(ocv,risk);
       }
     }
+    ocv.close();
     return;
   }
 
@@ -993,7 +1002,7 @@ bool comp(vector<double> a,vector<double> b){ return a[0]>b[0]; }
 // select significant snps based on training set
 
 // calculats receiver operating characterisic and its area under curve
-void roc(vector<vector<double> > &risk){
+void roc(ofstream &ocv,vector<vector<double> > &risk){
 
     double n0=0;
     double n1=0;
@@ -1042,8 +1051,10 @@ void roc(vector<vector<double> > &risk){
     se=sqrt(se);
     double za=1.959964;               // Phi^{-1}(1-0.05/2)
 
-    if(master) cout << "AUC: " << auc << " +- " << za*se << " (95% CI)\n\n";;
-
+    if(master){
+      cout << "AUC: " << auc << " +- " << za*se << " (95% CI)\n\n";;
+      ocv << auc << " " << za*se << endl;
+    }
 }
 
 void snp_select(const vector<vector<vector<short> > > &ai,int nv,

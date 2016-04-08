@@ -612,7 +612,6 @@ void il_stat(ofstream& of,int nchr,string &rsn,int pos,char minor,int nmiss[],bo
        if(model==GEN) of << setw(11) << left << "NA" << "  ";
        of << setw(11) << left << "NA" << "  ";
        of << setw(11) << left << "NA" << "  ";
-       of << setw(4) << left << "NA" << "  ";
        of << setw(11) << left << "NA" << endl;
      }
 }
@@ -1026,6 +1025,8 @@ void pr_tped(string &tped,string &tfam,string &meta_file,string &par_file,string
    int nsample=0;   // no. of samples
    vector<string> mtped; 
    vector<string> mtfam;
+   ofstream ocv;
+   if(master) ocv.open("gedi.auc",ios::out);
 
    if(q_meta){      // meta analysis
      ifstream mf;
@@ -1276,9 +1277,9 @@ void pr_tped(string &tped,string &tfam,string &meta_file,string &par_file,string
 
    bool comp(vector<double>a,vector<double> b);
    sort(risk.begin(),risk.end(),comp);
-   void roc(vector<vector<double> > &risk);
-   roc(risk);
-
+   void roc(ofstream &ocv,vector<vector<double> > &risk);
+   roc(ocv,risk);
+   if(master) ocv.close();
 }
 
 // Perform cross-validation using binary file
@@ -1337,6 +1338,8 @@ void il_bpr(string &meta_file,string &out_file,string &par_file,bool q_lr){
     for(int n=0;n<nind[y];n++)
       ai[y][n].resize(nsnp);
   }
+  ofstream ocv;
+  if(master) ocv.open("gedi.auc",ios::out);
 
   for(int i=0;i<nsnp;i++){  // loop over snps
 
@@ -1466,9 +1469,9 @@ void il_bpr(string &meta_file,string &out_file,string &par_file,bool q_lr){
 
   bool comp(vector<double>a,vector<double> b);
   sort(risk.begin(),risk.end(),comp);
-  void roc(vector<vector<double> > &risk);
-  roc(risk);
-
+  void roc(ofstream &ocv,vector<vector<double> > &risk);
+  roc(ocv,risk);
+  if(master) ocv.close();
 }
 
 void tped_out(ofstream &qcout,int nchr,string &rsn,string &fid,int pos,string &gi0,string &gi1){

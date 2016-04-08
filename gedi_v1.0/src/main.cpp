@@ -30,6 +30,7 @@ bool q_qij=false;          // flag for interaction LR statistic
 bool q_pi=true;            // flag for single-locus p-value
 bool q_pij=false;          // flag for interaction p-values
 bool q_dump=false;         // flag for writing SNP selection lists during IL-cv
+bool q_pout=false;         // flag for asymptotic p-value output
 string excl_file="";       // snp exclusion list file 
 double pcut=-1;            // p-value cutoff for cross-validation
 double tol=1.0e-5;         // iteration tolerance
@@ -171,6 +172,8 @@ int main(int argc,char* argv[]){
          q_pl=true;
        else if(flag=="mf")
          q_mf=true;
+       else if(flag=="pvout")
+         q_pout=true;
 #ifdef MPIP
        else if(flag=="mfp"){
          q_mfp=true;
