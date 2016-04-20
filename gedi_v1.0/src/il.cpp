@@ -91,7 +91,7 @@ void read_bfm(vector<string> &mbfile,const string& meta,int nind[2],vector<vecto
       iss >> y; y--;
       if(y<0 || y>1){
         if(master) cerr << "Unknown phenotype code in tfam file\n";
-        exit(1);
+        end();
       }
       phe[s].push_back(y);
       nind[y]++;
@@ -124,25 +124,46 @@ void read_bfm(vector<string> &mbfile,const string& meta,int nind[2],vector<vecto
       else{
         if(snp!=rs[nsnp2]){
           if(master) cerr << "SNP " << snp << " in " <<  mbfile[s]+".bim does not match "
-                          << mbfile[0]+".bim\n";
+                          << mbfile[0]+".bim. Bye!\n";
           end();
         }
       }
       int ipos;
       iss >> ipos; iss >> ipos;
       if(s==0) pos.push_back(ipos);
+      else{
+        if(ipos!=pos[nsnp2]){
+          if(master) cerr << "SNP " << snp << " position in " <<  mbfile[s]+".bim does not match "
+                          << mbfile[0]+".bim. Bye!\n";
+          end();
+        }
+      }
       char a;
       iss >> a;
       if(s==0) a0.push_back(a);
+      else{
+        if(a !=a0[nsnp2]){
+          if(master) cerr << "SNP " << snp << " A1 in " <<  mbfile[s]+".bim does not match "
+                          << mbfile[0]+".bim. Bye!\n";
+          end();
+        }
+      }
       iss >> a;
       if(s==0) a1.push_back(a);
+      else{
+        if(a !=a1[nsnp2]){
+          if(master) cerr << "SNP " << snp << " A2 in " <<  mbfile[s]+".bim does not match "
+                          << mbfile[0]+".bim. Bye!\n";
+          end();
+        }
+      }
       nsnp2++;
     }
     if(s==0) nsnp=nsnp2;
     else{
       if(nsnp2!=nsnp){
         if(master) cerr << "No. of SNPs in " << mbfile[s]+".bim does not match "
-                        << mbfile[0]+".bim\n.";
+                        << mbfile[0]+".bim. Bye!\n.";
         end();
       }
     }
@@ -261,7 +282,8 @@ void il_bed(string &meta,string &out_file,bool q_lr){
       }
       int nmiss[2]={0,};
       double fr1[2][2]={{0,}};
-      freq(nmiss,gi0,gi1,phe[s],minor,major,rsk,fr1);
+      freq(nmiss,gi0,gi1,phe[s],minor,major,rsk,fr1,s);  // if s==0, minor/major are set; otherwise 
+                                                         // they are used and not changed
       double alp=0;
       double bet[2]={0,};
       double q=0;
@@ -488,7 +510,7 @@ void il_tped(string &tped,string &tfam,string &meta_file,string &out_file,bool q
          end();
        }
        int nmiss[2]={0,};
-       freq(nmiss,gi0,gi1,phe[s],minor,major,rsk,f1);
+       freq(nmiss,gi0,gi1,phe[s],minor,major,rsk,f1,s);
        double alp=0;
        double bet[2]={0,};
        double q=0;
@@ -612,6 +634,7 @@ void il_stat(ofstream& of,int nchr,string &rsn,int pos,char minor,int nmiss[],bo
        if(model==GEN) of << setw(11) << left << "NA" << "  ";
        of << setw(11) << left << "NA" << "  ";
        of << setw(11) << left << "NA" << "  ";
+       of << setw(4) << left << "NA" << "  ";
        of << setw(11) << left << "NA" << endl;
      }
 }
@@ -732,7 +755,7 @@ bool assoc(double f1[2][2],int nind[2],double &q,double &alpha,double beta[]){
 
 // calculates genotype frequencies at each locus 
 void freq(int nmiss[],const string &gi0,const string &gi1,const vector<short> &phe,
-    char &minor,char &major,char &rsk,double f1[2][2]){
+    char &minor,char &major,char &rsk,double f1[2][2],int s){
 
   char code[4]={'T','C','G','A'};
   int count[2][4]={{0,}};   // nt counts for T, C, G, A in case-control
@@ -774,7 +797,7 @@ void freq(int nmiss[],const string &gi0,const string &gi1,const vector<short> &p
     }
   }
 
-  if(g1==-1){
+  if(s==0 && g1==-1){
 //  estop(59);
     major=code[g0];
     minor=rsk='?';
@@ -792,26 +815,33 @@ void freq(int nmiss[],const string &gi0,const string &gi1,const vector<short> &p
   f0[0]/=nmiss[0]+nmiss[1];         // combined g0 allele freq
   f0[1]/=nmiss[0]+nmiss[1];         // combined g1 allele freq
 
-  if(q_minor_ctl){
-     if(f[0][0]<=f[0][1]){          // minor allele defined in control group
-       minor=code[g0];
-       major=code[g1];
-     }
-     else{
-       major=code[g0];
-       minor=code[g1];
-     }
-  }
-  else{ 
-    if(f0[0]<=f0[1]){               // minor allele defined over the whole sample
-      minor=code[g0];
-      major=code[g1];
+  if(s==0){                         // first sample; determine major/minor
+    if(q_minor_ctl){
+      if(f[0][0]<=f[0][1]){          // minor allele defined in control group
+         minor=code[g0];
+         major=code[g1];
+       }
+       else{
+         major=code[g0];
+         minor=code[g1];
+       }
     }
-    else{
-      major=code[g0];
-      minor=code[g1];
+    else{ 
+      if(f0[0]<=f0[1]){               // minor allele defined over the whole sample
+        minor=code[g0];
+        major=code[g1];
+      }
+      else{
+        major=code[g0];
+        minor=code[g1];
+      }
     }
   }
+  if( (major!=code[g0] && major!=code[g1]) || (minor!=code[g0] && minor!=code[g1])){
+    if(master) cerr << "Major/minor allele mismatch.\n";
+    end();
+  }
+
 //   ctl  g0 case g0
   if(f[0][0]<f[1][0])
     rsk=code[g0];
@@ -1176,7 +1206,7 @@ void pr_tped(string &tped,string &tfam,string &meta_file,string &par_file,string
          end();
        }
        int nmiss[2]={0,};
-       freq(nmiss,gi0,gi1,phe[s],minor,major,rsk,f1);
+       freq(nmiss,gi0,gi1,phe[s],minor,major,rsk,f1,s);
        int nc[2]={0,};
        for(int n=0;n<int(nsize);n++){
          int y=phe[s][n];
@@ -1380,7 +1410,7 @@ void il_bpr(string &meta_file,string &out_file,string &par_file,bool q_lr){
       }
       int nmiss[2]={0,};
       double fr1[2][2]={{0,}};
-      freq(nmiss,gi0,gi1,phe[s],minor,major,rsk,fr1);
+      freq(nmiss,gi0,gi1,phe[s],minor,major,rsk,fr1,s);
       int nc[2]={0,};
       for(int n=0;n<int(gi0.size());n++){
         int y=phe[s][n];
