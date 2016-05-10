@@ -41,18 +41,18 @@ extern bool q_pij;
 //extern vector<vector<double> > gamm;
 
 struct Pal{
-  const vector<vector<vector<short> > > &ai;
+  const vector<vector<vector<bool> > > &ai;
   double lambda;
   int i0;
   int j0;
 };
 
-void py(const vector<short> &ai,double &h,double &p,double alpha,const vector<vector<double> > &beta,
+void py(const vector<bool> &ai,double &h,double &p,double alpha,const vector<vector<double> > &beta,
     const vector<vector<vector<double> > > &gamm);
-double cl_min(const vector<string> &rs,const vector<vector<vector<short> > > &ai,double lambda,Theta &th,
+double cl_min(const vector<string> &rs,const vector<vector<vector<bool> > > &ai,double lambda,Theta &th,
     int i0,int j0);
 
-double cl_dlr(const vector<string> &rs,const vector<vector<vector<short> > > &ai,double lambda,Theta &th,bool q_qi){
+double cl_dlr(const vector<string> &rs,const vector<vector<vector<bool> > > &ai,double lambda,Theta &th,bool q_qi){
 
   if(master) cout << "LR inference with lambda = (" << Lh << ", " << lambda << ")\n";
 
@@ -61,7 +61,7 @@ double cl_dlr(const vector<string> &rs,const vector<vector<vector<short> > > &ai
   if(!q_marg)
     return dev;
 
-  int nsnp=ai[0][0].size();
+  int nsnp=ai[0][0].size()/2;
   vector<double> pi(nsnp);
   vector<vector<double> > pij(nsnp);
 
@@ -147,10 +147,10 @@ double cl_dlr(const vector<string> &rs,const vector<vector<vector<short> > > &ai
 }
 
 // performs cl DLR inference
-double cl_min(const vector<string> &rs,const vector<vector<vector<short> > > &ai,double lambda,Theta &th,
+double cl_min(const vector<string> &rs,const vector<vector<vector<bool> > > &ai,double lambda,Theta &th,
     int i0,int j0){
 
-  int nsnp=ai[0][0].size();
+  int nsnp=ai[0][0].size()/2;
   double lpr(int nsnp);
 
   th.beta.resize(nsnp);
@@ -235,7 +235,7 @@ double lnl_lr(const gsl_vector *v,void *params){  // evaluates log likelihood
 
   Pal *par=(Pal *)params;
 
-  int nsnp=(par->ai)[0][0].size();
+  int nsnp=(par->ai)[0][0].size()/2;
   int nind[2]={int((par->ai)[0].size()),int((par->ai)[1].size())};
   double lambda=par->lambda;
   int i0=par->i0;
@@ -290,18 +290,18 @@ double lnl_lr(const gsl_vector *v,void *params){  // evaluates log likelihood
 
 int code(int a,Model model);
 
-void py(const vector<short> &ai,double &h,double &p,double alpha2,
+void py(const vector<bool> &ai,double &h,double &p,double alpha2,
     const vector<vector<double> > &beta2,const vector<vector<vector<double> > > &gamm2){
 
   h=alpha2;
-  int nsnp=ai.size();
+  int nsnp=ai.size()/2;
   for(int i=0;i<nsnp;i++){
-    int a=ai[i];
+    int a=2*ai[2*i]+ai[2*i+1];
     int ia=code(a,model);
     if(ia==0) continue;
     h+=beta2[i][ia-1];
     for(int j=i+1;j<nsnp;j++){
-      int b=ai[j];
+      int b=2*ai[2*j]+ai[2*j+1];
       int jb=code(b,model);
       if(jb==0) continue;
       h+=gamm2[i][j][2*(ia-1)+jb-1];
@@ -314,7 +314,7 @@ void py(const vector<short> &ai,double &h,double &p,double alpha2,
 void dlnl_lr(const gsl_vector *v,void *params,gsl_vector *df){   // first derivatives
 
   Pal *par=(Pal *)params;
-  int nsnp=(par->ai)[0][0].size();
+  int nsnp=(par->ai)[0][0].size()/2;
   int nind[2]={int((par->ai)[0].size()),int((par->ai)[1].size())};
   double lambda=par->lambda;
   int i0=par->i0;
@@ -363,17 +363,18 @@ void dlnl_lr(const gsl_vector *v,void *params,gsl_vector *df){   // first deriva
 
   double h,p;
   for(int y=0;y<2;y++) for(int n=0;n<nind[y];n++){
-    py((par->ai)[y][n],h,p,alpha2,beta2,gamm2);
+    vector<bool> ail=(par->ai)[y][n];
+    py(ail,h,p,alpha2,beta2,gamm2);
     s0+=p-y;
     for(int i=0;i<nsnp;i++){
-      int a=(par->ai)[y][n][i];
+      int a=2*ail[2*i]+ail[2*i+1];
       int ia=code(a,model);
       if(ia==0) continue;
       if(i0!=i)
         s1[i][ia-1]+=p-y;
       for(int j=i+1;j<nsnp;j++){
         if(i0==i && j0==j) continue;
-        int b=(par->ai)[y][n][j];
+        int b=2*ail[2*j]+ail[2*j+1];
         int jb=code(b,model);
         if(jb==0) continue;
         s2[i][j][2*(ia-1)+jb-1]+=p-y;

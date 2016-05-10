@@ -34,7 +34,7 @@ const double Tolq=1.0e-7;
 extern int Npr;
 extern int master;
 
-void infer_par(int nv,const vector<vector<vector<short> > > &ai,double &alpha,
+void infer_par(int nv,const vector<vector<vector<bool> > > &ai,double &alpha,
       vector<double> &beta1,vector<double> &beta2,vector<double> &pv);
 
 // read binary bim/fam files
@@ -941,17 +941,17 @@ void read_par(ifstream &prf,double &alpha,vector<double> &beta1,vector<double> &
 
 }
 
-void pr(ofstream &of,const vector<vector<vector<vector<short> > > > &ai,
+void pr(ofstream &of,const vector<vector<vector<vector<bool> > > > &ai,
     double &alpha,const vector<double> &beta1,
     const vector<double> &beta2,const vector<double> &pv,vector<vector<double> > &risk){
 
   int nsample=ai.size();
-  int nsnp=ai[0][0][0].size();
+  int nsnp=ai[0][0][0].size()/2;
   int msnp=0;
 
   for(int s=0;s<nsample;s++){
     int nind[2]={int(ai[s][0].size()),int(ai[s][1].size())};
-    int nsnp=ai[s][0][0].size();
+    int nsnp=ai[s][0][0].size()/2;
     for(int y=0;y<2;y++) for(int n=0;n<nind[y];n++){
       double h=alpha;
       msnp=0;
@@ -960,7 +960,7 @@ void pr(ofstream &of,const vector<vector<vector<vector<short> > > > &ai,
           if(pv[i]>pcut) continue;   // select snps for non-cv
           msnp++;
         }
-        int a=ai[s][y][n][i];
+        int a=2*ai[s][y][n][2*i]+ai[s][y][n][2*i+1];
         switch(model){
           case DOM:
             h+=(a==1 || a==2)*beta1[i];
@@ -990,7 +990,7 @@ void pr(ofstream &of,const vector<vector<vector<vector<short> > > > &ai,
     cout << msnp << " out of " << nsnp << " included in model\n\n";
 }
 
-void infer_par(int nv,const vector<vector<vector<short> > > &ai,double &alpha,
+void infer_par(int nv,const vector<vector<vector<bool> > > &ai,double &alpha,
       vector<double> &beta1,vector<double> &beta2,vector<double> &pv){
 
   bool assoc(double f1[2][2],int nmiss[2],double &q,double &alpha,double beta[2]);
@@ -998,9 +998,8 @@ void infer_par(int nv,const vector<vector<vector<short> > > &ai,double &alpha,
   int nmiss[2]={0,};        // no. of non-missing individuals
 
   double beta[2]={0,};
-  vector<vector<short> > ani(2);            // single snp genotype 
 
-  int nsnp=ai[0][0].size();
+  int nsnp=ai[0][0].size()/2;
   int nind[2]={int(ai[0].size()),int(ai[1].size())};
   alpha=0;
   for(int i=0;i<nsnp;i++){
@@ -1015,7 +1014,8 @@ void infer_par(int nv,const vector<vector<vector<short> > > &ai,double &alpha,
       }
       for(int n=0;n<nind[y];n++){
         if(n>=nv*nval && n<(nv+1)*nval) continue;
-        switch(ai[y][n][i]){
+        int b=2*ai[y][n][2*i]+ai[y][n][2*i+1];
+        switch(b){
           case 0:           // aa
             nmiss[y]++;
             break;
@@ -1166,7 +1166,7 @@ void pr_tped(string &tped,string &tfam,string &meta_file,string &par_file,string
        else cout << ": \n\n";
      }
    }
-   vector<vector<vector<short> > > ai(2);    // genotype ai[y][n][i]
+   vector<vector<vector<bool> > > ai(2);    // genotype ai[y][n][i]
    ai[0].resize(nind[0]);
    ai[1].resize(nind[1]);
 
@@ -1212,13 +1212,20 @@ void pr_tped(string &tped,string &tfam,string &meta_file,string &par_file,string
          int y=phe[s][n];
          char c0=gi0.at(n);
          char c1=gi1.at(n);
-         if((c0!=major && c0!=minor) || (c1!=major && c1!=minor)) // NA
-           ai[y][nptr[s][y]+nc[y]].push_back(-1);
+         if((c0!=major && c0!=minor) || (c1!=major && c1!=minor)){ // NA
+           ai[y][nptr[s][y]+nc[y]].push_back(true);
+           ai[y][nptr[s][y]+nc[y]].push_back(true);
+         }
          else{
            int cnt=0;
            if(gi0.at(n)==minor) cnt++;
            if(gi1.at(n)==minor) cnt++;
-           ai[y][nptr[s][y]+nc[y]].push_back(cnt);
+           bool b0=false; 
+           bool b1=false;
+           if(cnt==1) b1=true;
+           if(cnt==2) b0=true;
+           ai[y][nptr[s][y]+nc[y]].push_back(b0);
+           ai[y][nptr[s][y]+nc[y]].push_back(b1);
          }
          nc[y]++;
        }
@@ -1248,8 +1255,8 @@ void pr_tped(string &tped,string &tfam,string &meta_file,string &par_file,string
    if(pcut<0)                         // p-value cutoff not specified
      pcut=0.05/nsnp;                  // Bonferroni
    cout << "p-value cutoff: " << pcut << endl << endl;
-   void snp_select_il(const vector<vector<vector<short> > > &ai,int nv,
-    vector<vector<vector<vector<short> > > > &av,vector<vector<vector<vector<short> > > > &aw,
+   void snp_select_il(const vector<vector<vector<bool> > > &ai,int nv,
+    vector<vector<vector<vector<bool> > > > &av,vector<vector<vector<vector<bool> > > > &aw,
     const vector<string> &rs,vector<string> &ra,const vector<vector<int> > &nptr,
     double &alpha,vector<double> &beta1,vector<double> &beta2);
 
@@ -1257,8 +1264,8 @@ void pr_tped(string &tped,string &tfam,string &meta_file,string &par_file,string
    double mav=0;
    if(q_cv){                          // cross-validation
      for(int nv=0;nv<ncv;nv++){
-       vector<vector<vector<vector<short> > > > av(nsample);
-       vector<vector<vector<vector<short> > > > aw(nsample);
+       vector<vector<vector<vector<bool> > > > av(nsample);
+       vector<vector<vector<vector<bool> > > > aw(nsample);
        vector<string> ra;
        cout << "Cross-validation run " << nv+1 << ":\n";
 //     infer_par(nv,ai,alpha,beta1,beta2,pv);  // training set
@@ -1299,7 +1306,7 @@ void pr_tped(string &tped,string &tfam,string &meta_file,string &par_file,string
      if(model==GEN) beta2.resize(nsnp);
      read_par(prf,alpha,beta1,beta2,pv);   // read parameters
      prf.close();
-     vector<vector<vector<vector<short> > > > aw(1);
+     vector<vector<vector<vector<bool> > > > aw(1);
      aw[0]=ai;
      pr(of,aw,alpha,beta1,beta2,pv,risk);
    }
@@ -1362,11 +1369,11 @@ void il_bpr(string &meta_file,string &out_file,string &par_file,bool q_lr){
     }
   }
 
-  vector<vector<vector<short> > > ai(2);   // genotype array
+  vector<vector<vector<bool> > > ai(2);   // genotype array
   for(int y=0;y<2;y++){
     ai[y].resize(nind[y]);
     for(int n=0;n<nind[y];n++)
-      ai[y][n].resize(nsnp);
+      ai[y][n].resize(2*nsnp);
   }
   ofstream ocv;
   if(master) ocv.open("gedi.auc",ios::out);
@@ -1417,13 +1424,20 @@ void il_bpr(string &meta_file,string &out_file,string &par_file,bool q_lr){
         char c0=gi0.at(n);
         char c1=gi1.at(n);
         int k=nptr[s][y]+nc[y];
-        if((c0!=major && c0!=minor) || (c1!=major && c1!=minor)) // NA
-          ai[y][k][i]=-1;
+        if((c0!=major && c0!=minor) || (c1!=major && c1!=minor)){ // NA
+          ai[y][k][2*i]=true;
+          ai[y][k][2*i+1]=true;
+        }
         else{
           int cnt=0;
           if(gi0.at(n)==minor) cnt++;
           if(gi1.at(n)==minor) cnt++;
-          ai[y][k][i]=cnt;
+          bool b0=false;
+          bool b1=false;
+          if(cnt==1) b1=true;
+          if(cnt==2) b0=true;
+          ai[y][k][2*i]=b0;
+          ai[y][k][2*i+1]=b1;
         }
         nc[y]++;
       }
@@ -1441,8 +1455,8 @@ void il_bpr(string &meta_file,string &out_file,string &par_file,bool q_lr){
   if(pcut<0)                         // p-value cutoff not specified
     pcut=0.05/nsnp;                  // Bonferroni
   cout << "p-value cutoff: " << pcut << endl << endl;
-  void snp_select_il(const vector<vector<vector<short> > > &ai,int nv,
-    vector<vector<vector<vector<short> > > > &av,vector<vector<vector<vector<short> > > > &aw,
+  void snp_select_il(const vector<vector<vector<bool> > > &ai,int nv,
+    vector<vector<vector<vector<bool> > > > &av,vector<vector<vector<vector<bool> > > > &aw,
     const vector<string> &rs,vector<string> &ra,const vector<vector<int> > &nptr,
     double &alpha,vector<double> &beta1,vector<double> &beta2);
 
@@ -1450,8 +1464,8 @@ void il_bpr(string &meta_file,string &out_file,string &par_file,bool q_lr){
   if(q_cv){
     double mav=0;
     for(int nv=0;nv<ncv;nv++){
-       vector<vector<vector<vector<short> > > >  av(nsample);
-       vector<vector<vector<vector<short> > > >  aw(nsample);
+       vector<vector<vector<vector<bool> > > >  av(nsample);
+       vector<vector<vector<vector<bool> > > >  aw(nsample);
        vector<string> ra;
        cout << "Cross-validation run " << nv+1 << ":\n";
        snp_select_il(ai,nv,av,aw,rs,ra,nptr,alpha,beta1,beta2);
@@ -1491,7 +1505,7 @@ void il_bpr(string &meta_file,string &out_file,string &par_file,bool q_lr){
      if(model==GEN) beta2.resize(nsnp);
      read_par(prf,alpha,beta1,beta2,pv);   // read parameters
      prf.close();
-     vector<vector<vector<vector<short> > > > aw(1);
+     vector<vector<vector<vector<bool> > > > aw(1);
      aw[0]=ai;
      pr(of,aw,alpha,beta1,beta2,pv,risk);
   }
@@ -1516,12 +1530,12 @@ void tped_out(ofstream &qcout,int nchr,string &rsn,string &fid,int pos,string &g
 
 }
 
-void snp_select_il(const vector<vector<vector<short> > > &ai,int nv,
-  vector<vector<vector<vector<short> > > > &av,vector<vector<vector<vector<short> > > > &aw,
+void snp_select_il(const vector<vector<vector<bool> > > &ai,int nv,
+  vector<vector<vector<vector<bool> > > > &av,vector<vector<vector<vector<bool> > > > &aw,
   const vector<string> &rs,vector<string> &ra,const vector<vector<int> > &nptr,
     double &alpha,vector<double> &beta1,vector<double> &beta2){
 
-  int nsnp=ai[0][0].size();
+  int nsnp=ai[0][0].size()/2;
   int nsample=nptr.size()-1;
   bool nna=true;
   int nsig=0;
@@ -1548,8 +1562,8 @@ void snp_select_il(const vector<vector<vector<short> > > &ai,int nv,
         for(int n=0;n<nsize;n++){
           if(nv!=-1 && n>=nv*nval && n<(nv+1)*nval) continue;    // skip the test set
           nc[s][y]++;
-          int a=ai[y][n+nptr[s][y]][i];
-          if(a<0) continue;
+          int a=2*ai[y][n+nptr[s][y]][2*i]+ai[y][n+nptr[s][y]][2*i+1];
+          if(a>2) continue;
           nmiss[y]++;
           if(a>0)
             fr1[y][a-1]++;
@@ -1602,10 +1616,11 @@ void snp_select_il(const vector<vector<vector<short> > > &ai,int nv,
       int nsize=nptr[s+1][y]-nptr[s][y];
       int nval=int(nsize/ncv);
       for(int n=0;n<nsize;n++){
-        vector<short> dummy(nsig);
+        vector<bool> dummy(2*nsig);
         for(int m=0;m<nsig;m++){
           int i=slist[m];
-          dummy[m]=ai[y][n+nptr[s][y]][i];
+          dummy[2*m]=ai[y][n+nptr[s][y]][2*i];
+          dummy[2*m+1]=ai[y][n+nptr[s][y]][2*i+1];
         }
         if(nv==-1 || (n>=nv*nval && n<(nv+1)*nval))    // test set (or no CV)
           aw[s][y].push_back(dummy);
