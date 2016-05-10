@@ -86,7 +86,7 @@ double alpha;
 vector<vector<double> >  beta;             // differences beta
 vector<vector<vector<double> > > gamm;
 vector<bool> qsig;                        // flag for snp selection
-void func2(int nsnp,bool qz,int n,vector<bool> &gi,double& z,vector<vector<double> > &s1,
+void func2(int nsnp,bool qz,int n,vector<short> &gi,double& z,vector<vector<double> > &s1,
       vector<vector<vector<double> > > &s2,vector<vector<double> > &h1,
       vector<vector<vector<double> > > &J1);
 
@@ -1573,19 +1573,19 @@ double pan(int nsnp,const vector<bool> &ai,const vector<vector<double> > &h1,
 }
 
 // prob for individual n
-double pan_ee(int nsnp,const vector<bool> &gi,const vector<vector<double> > &h1,
+double pan_ee(int nsnp,const vector<short> &gi,const vector<vector<double> > &h1,
     const vector<vector<vector<double> > > &J1){
 
   double p;
 
   double f=0;
   for(int i=0;i<nsnp;i++){
-    int a=2*gi[2*i]+gi[2*i+1];
+    int a=gi[i];
     double e=0;
     if(a==0) continue;
     e=h1[i][a-1];
     for(int j=i+1;j<nsnp;j++){
-      int b=2*gi[2*j]+gi[2*j+1];
+      int b=gi[j];
       if(b>0)
         e+=J1[i][j][2*(a-1)+b-1];
     }
@@ -1659,7 +1659,7 @@ void f12(int cc,const vector<vector<vector<bool> > > &ai,vector<vector<double> >
   }
 }
 
-void func2(int nsnp,bool qz,int n,vector<bool> &gi,double& z,vector<vector<double> > &s1,
+void func2(int nsnp,bool qz,int n,vector<short> &gi,double& z,vector<vector<double> > &s1,
       vector<vector<vector<double> > > &s2,vector<vector<double> > &h1,
       vector<vector<vector<double> > > &J1){
 // calculates averages over enumerated genotypes
@@ -1670,7 +1670,7 @@ void func2(int nsnp,bool qz,int n,vector<bool> &gi,double& z,vector<vector<doubl
        z+=p;
      else{
        for(int i=0;i<nsnp;i++){
-         int a=2*gi[2*i]+gi[2*i+1];
+         int a=gi[i];
          if(a==0) continue;
          s1[i][a-1]+=p/z;
          for(int j=i+1;j<nsnp;j++){
@@ -1991,7 +1991,7 @@ double lnl(const gsl_vector *v,void *params){  // evaluates log likelihood
 
   vector<vector<double> > h1(nsnp);
   vector<vector<vector<double> > > J1(nsnp);
-  vector<bool> gi(nsnp);
+  vector<short> gi(nsnp);
   vector<vector<double> > s1(nsnp);
   vector <vector<vector<double> > > s2(nsnp);
 
@@ -2053,7 +2053,7 @@ void dlnl(const gsl_vector *v,void *params,gsl_vector *df){   // first derivativ
 
   vector<vector<double> > h1(nsnp);
   vector<vector<vector<double> > > J1(nsnp);
-  vector<bool> gi(nsnp);
+  vector<short> gi(nsnp);
   vector<vector<double> > s1(nsnp);
   vector <vector<vector<double> > > s2(nsnp);
 
