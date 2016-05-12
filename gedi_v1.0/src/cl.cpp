@@ -69,7 +69,7 @@ const int Nb=32;         // block size for parallel MF (ScaLAPACK)
 struct Pares{            // bundles of parameters for minimization
   const vector<vector<vector<bool> > > &ai;
   const vector<vector<double> > &f1;
-  const vector<vector<vector<double> > > &f2;
+  const vector<vector<vector<float> > > &f2;
   int cc;
   double z;
   int ix;
@@ -80,15 +80,17 @@ struct Pares{            // bundles of parameters for minimization
 };
 
 vector<vector<vector<vector<double> > > >  h; // single-site fields h[s][y][i][l]
-vector<vector<vector<vector<vector<double> > > > > J; 
+//vector<vector<vector<vector<vector<double> > > > > J; 
+vector<vector<vector<vector<vector<float> > > > > J; 
                                            // coupling parameters  J[s][y][i][j][11,12,21,22]
 double alpha;
 vector<vector<double> >  beta;             // differences beta
-vector<vector<vector<double> > > gamm;
+//vector<vector<vector<double> > > gamm;
+vector<vector<vector<float> > > gamm;
 vector<bool> qsig;                        // flag for snp selection
 void func2(int nsnp,bool qz,int n,vector<short> &gi,double& z,vector<vector<double> > &s1,
       vector<vector<vector<double> > > &s2,vector<vector<double> > &h1,
-      vector<vector<vector<double> > > &J1);
+      vector<vector<vector<float> > > &J1);
 
 // exits
 
@@ -108,7 +110,7 @@ int code(int a,Model model){
 
 #ifdef MPIP
 extern "C"{
-  void invrs_(double *mat,int *N,int *Nb,int *nproc,int *rank);
+  void invrs_(float *mat,int *N,int *Nb,int *nproc,int *rank);
 };
 #endif
 
@@ -158,7 +160,8 @@ void read_par_cl(const vector<vector<vector<bool> > > &ai,const string &par,
     int i=0;
     int n=0;
     int l0=0;
-    vector<vector<double> > dummy2;
+    vector<vector<float> > dummy2;
+    vector<float> dummy12;
     vector<double> dummy1;
     while(getline(prf,line)){
       if(line.size()==0) continue;  // ignore blank line
@@ -181,7 +184,7 @@ void read_par_cl(const vector<vector<vector<bool> > > &ai,const string &par,
       }
       double f=0;
       for(int j=0;j<i;j++){
-        if(l0==0) th.gamm[i].push_back(dummy1);
+        if(l0==0) th.gamm[i].push_back(dummy12);
         for(int l1=0;l1<L;l1++){
           iss >> f;
           th.gamm[i][j].push_back(f);  // lower-triangle
@@ -189,7 +192,7 @@ void read_par_cl(const vector<vector<vector<bool> > > &ai,const string &par,
       }
       if(l0==0){
         th.beta.push_back(dummy1);       // diagonal term
-        th.gamm[i].push_back(dummy1);
+        th.gamm[i].push_back(dummy12);
       }
       for(int l1=0;l1<L;l1++){
         iss >> f;
@@ -200,7 +203,7 @@ void read_par_cl(const vector<vector<vector<bool> > > &ai,const string &par,
       int j=i+1;
       while(iss >> f){                 // upper-triangle
         if(l0==0)
-          th.gamm[i].push_back(dummy1);
+          th.gamm[i].push_back(dummy12);
         th.gamm[i][j].push_back(f); 
         for(int l=1;l<L;l++){
           iss >> f;
@@ -999,7 +1002,7 @@ void par_out(ofstream &of,const vector<string> &rs,double dev,int nsig,
   double teff=0;
   for(int s=0;s<nsample;s++){
     vector<vector<double> > f1;
-    vector<vector<vector<double> > > f2;
+    vector<vector<vector<float> > > f2;
     for(int y=0;y<2;y++) f12(y,aw[s],f1,f2);              // calculate mean frqs
     int nind[2]={int(aw[s][0].size()),int(aw[s][1].size())};
     double neff=2.0/sqrt(1.0/nind[0]+1.0/nind[1]);
@@ -1181,7 +1184,7 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,bool q_qi,
   int nsnp=ai[0][0][0].size()/2;
   int nsample=nptr.size()-1;   // no. of samples
   vector<vector<vector<vector<double> > > > f1(nsample);   // empirical frequencies of minor alleles
-  vector<vector<vector<vector<vector<double> > > > > f2(nsample);   
+  vector<vector<vector<vector<vector<float> > > > > f2(nsample);   
                                              // empirical correlation of minor alleles
 
 #ifdef MPIP
@@ -1355,7 +1358,7 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,bool q_qi,
   if(master) cout << endl;
 
   void marginal(const vector<vector<vector<vector<bool> > > > &ai,
-    const vector<vector<vector<vector<double> > > > &f1,const vector<vector<vector<vector<vector<double> > > > > &f2,
+    const vector<vector<vector<vector<double> > > > &f1,const vector<vector<vector<vector<vector<float> > > > > &f2,
     const vector<string> &rs,double lkl,double z[3],double lambda,const vector<vector<int> > &nptr,
     Theta th[]);
   if(q_marg)
@@ -1367,7 +1370,7 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,bool q_qi,
 // marginal p-value calculation
 void marginal(const vector<vector<vector<vector<bool> > > > &ai,
     const vector<vector<vector<vector<double> > > > &f1,
-    const vector<vector<vector<vector<vector<double> > > > > &f2,
+    const vector<vector<vector<vector<vector<float> > > > > &f2,
     const vector<string> &rs,double lkl,double z[3],
     double lambda,const vector<vector<int> > &nptr,Theta th[]){
 
@@ -1375,14 +1378,14 @@ void marginal(const vector<vector<vector<vector<bool> > > > &ai,
   int nsnp=ai[0][0][0].size()/2;
   vector<vector<double> > hn(nsnp);
   vector<double> pi(nsnp);
-  vector<vector<vector<double> > > Jn(nsnp);
+  vector<vector<vector<float> > > Jn(nsnp);
   vector<vector<double> > pij(nsnp);
   for(int i=0;i<nsnp;i++){
     Jn[i].resize(nsnp);
     pij[i].resize(nsnp);
   }
   double lkhood_psl(int i,int cc,const vector<vector<vector<bool> > > &ai,const vector<double> &h,
-      const vector<vector<double> > &J,double lambda);
+      const vector<vector<float> > &J,double lambda);
 
   if(master){
     if(q_pij || q_qij)
@@ -1549,7 +1552,7 @@ void marginal(const vector<vector<vector<vector<bool> > > > &ai,
 
 // prob for individual n
 double pan(int nsnp,const vector<bool> &ai,const vector<vector<double> > &h1,
-    const vector<vector<vector<double> > > &J1){
+    const vector<vector<vector<float> > > &J1){
 
   double f=0;
 
@@ -1574,7 +1577,7 @@ double pan(int nsnp,const vector<bool> &ai,const vector<vector<double> > &h1,
 
 // prob for individual n
 double pan_ee(int nsnp,const vector<short> &gi,const vector<vector<double> > &h1,
-    const vector<vector<vector<double> > > &J1){
+    const vector<vector<vector<float> > > &J1){
 
   double p;
 
@@ -1597,7 +1600,7 @@ double pan_ee(int nsnp,const vector<short> &gi,const vector<vector<double> > &h1
 }
 
 void f12(int cc,const vector<vector<vector<bool> > > &ai,vector<vector<double> > &f1,
-    vector<vector<vector<double> > > &f2){
+    vector<vector<vector<float> > > &f2){
 
   int nsnp;
   if(cc<2)
@@ -1660,8 +1663,8 @@ void f12(int cc,const vector<vector<vector<bool> > > &ai,vector<vector<double> >
 }
 
 void func2(int nsnp,bool qz,int n,vector<short> &gi,double& z,vector<vector<double> > &s1,
-      vector<vector<vector<double> > > &s2,vector<vector<double> > &h1,
-      vector<vector<vector<double> > > &J1){
+      vector<vector<vector<float> > > &s2,vector<vector<double> > &h1,
+      vector<vector<vector<float> > > &J1){
 // calculates averages over enumerated genotypes
      
    if(n==0){                  // a new genotype generated
@@ -1691,10 +1694,10 @@ void func2(int nsnp,bool qz,int n,vector<short> &gi,double& z,vector<vector<doub
 }
 
 double pan2(int nsnp,int i0,const vector<bool> &ci,vector<double> h1,
-  const vector<vector<double> > &J1){
+  const vector<vector<float> > &J1){
 
   void pan3(vector<double> &peff,int nsnp,int i0,const vector<bool> &ci,vector<double> h1,
-    const vector<vector<double> > &J1);
+    const vector<vector<float> > &J1);
 
   vector<double> peff(L);
 
@@ -1714,7 +1717,7 @@ double pan2(int nsnp,int i0,const vector<bool> &ci,vector<double> h1,
 
 // returns conditional probability P(a_i0^k=a|a_j^k)
 void pan3(vector<double> &peff,int nsnp,int i0,const vector<bool> &ci,vector<double> h1,
-  const vector<vector<double> > &J1){
+  const vector<vector<float> > &J1){
 
   peff.resize(L);
 
@@ -1748,7 +1751,7 @@ double lnl_psl(const gsl_vector *v,void *params){  // evaluates log likelihood
   double lambda=par->lambda;
 
   vector<double> h1(L);
-  vector<vector<double> > J1(nsnp);
+  vector<vector<float> > J1(nsnp);
   for(int j=0;j<nsnp;j++) J1[j].resize(L*L);
 
   int m=0;
@@ -1773,7 +1776,7 @@ double lnl_psl(const gsl_vector *v,void *params){  // evaluates log likelihood
 
   int nind[2]={int((par->ai)[0].size()),int((par->ai)[1].size())};
   double pan2(int nsnp,int i0,const vector<bool> &ci,vector<double> h1,
-      const vector<vector<double> > &J1);
+      const vector<vector<float> > &J1);
   ln=0;
   int k0=(cc<2 ? cc : 0);
   int k1=(cc<2 ? cc+1 : 2);
@@ -1800,7 +1803,7 @@ double lnl_psl(const gsl_vector *v,void *params){  // evaluates log likelihood
 void dlnl_psl(const gsl_vector *v,void *params,gsl_vector *df){   // first derivatives
 
   void pan3(vector<double> &peff,int nsnp,int i0,const vector<bool> &ci,vector<double> h1,
-      const vector<vector<double> > &J1);
+      const vector<vector<float> > &J1);
   Pares *par=(Pares *)params;
   int y=par->cc;
   int i0=par->i0;
@@ -1814,7 +1817,7 @@ void dlnl_psl(const gsl_vector *v,void *params,gsl_vector *df){   // first deriv
   vector<vector<double> > s2(nsnp);
 
   vector<double> h1(L);
-  vector<vector<double> > J1(nsnp);
+  vector<vector<float> > J1(nsnp);
   for(int j=0;j<nsnp;j++) J1[j].resize(L*L);
 
   int m=0;
@@ -1838,7 +1841,7 @@ void dlnl_psl(const gsl_vector *v,void *params,gsl_vector *df){   // first deriv
 
   int nind[2]={int((par->ai)[0].size()),int((par->ai)[1].size())};
   double pan2(int nsnp,int i0,const vector<bool> &ci,vector<double> h1,
-      const vector<vector<double> > &J1);
+      const vector<vector<float> > &J1);
 
   for(int l=0;l<L;l++) s1[l]=0;
   for(int i=0;i<nsnp;i++){
@@ -1897,8 +1900,8 @@ void ln_dln_psl(const gsl_vector *x,void *params,double *f,gsl_vector *df){
 }
 
 double lpr_psl(int i0,int cc,const vector<vector<vector<bool> > > &ai,
-    const vector<vector<double> > &f1,const vector<vector<vector<double> > > &f2,double lambda,
-    vector<double> &h,vector<vector<double> > &J,int ifixed,int jfixed,int is){
+    const vector<vector<double> > &f1,const vector<vector<vector<float> > > &f2,double lambda,
+    vector<double> &h,vector<vector<float> > &J,int ifixed,int jfixed,int is){
 
   size_t iter=0;
   int status;
@@ -1982,7 +1985,7 @@ double lnl(const gsl_vector *v,void *params){  // evaluates log likelihood
 
   double pn,ln;
   double pan(int nsnp,const vector<bool> &ai,const vector<vector<double> > &h1,
-      const vector<vector<vector<double> > > &J1);
+      const vector<vector<vector<float> > > &J1);
 
   Pares *par=(Pares *)params;
   int nsnp=(par->ai)[0][0].size()/2;
@@ -1990,10 +1993,10 @@ double lnl(const gsl_vector *v,void *params){  // evaluates log likelihood
   double lambda=par->lambda;
 
   vector<vector<double> > h1(nsnp);
-  vector<vector<vector<double> > > J1(nsnp);
+  vector<vector<vector<float> > > J1(nsnp);
   vector<short> gi(nsnp);
   vector<vector<double> > s1(nsnp);
-  vector <vector<vector<double> > > s2(nsnp);
+  vector <vector<vector<float> > > s2(nsnp);
 
   int m=0;
   for(int i=0;i<nsnp;i++){                    // extract parameters
@@ -2052,10 +2055,10 @@ void dlnl(const gsl_vector *v,void *params,gsl_vector *df){   // first derivativ
   int j0=par->jx;
 
   vector<vector<double> > h1(nsnp);
-  vector<vector<vector<double> > > J1(nsnp);
+  vector<vector<vector<float> > > J1(nsnp);
   vector<short> gi(nsnp);
   vector<vector<double> > s1(nsnp);
-  vector <vector<vector<double> > > s2(nsnp);
+  vector <vector<vector<float> > > s2(nsnp);
 
   int m=0;
   for(int i=0;i<nsnp;i++){                    // extract parameters
@@ -2106,8 +2109,8 @@ void ln_dln(const gsl_vector *x,void *params,double *f,gsl_vector *df){
 }
 
 double lpr(int cc,const vector<vector<vector<bool> > > &ai,const vector<vector<double> > &f1,
-    const vector<vector<vector<double> > > &f2,double lambda,
-    double z[2],vector<vector<double> > &h2,vector<vector<vector<double> > > &J2,
+    const vector<vector<vector<float> > > &f2,double lambda,
+    double z[2],vector<vector<double> > &h2,vector<vector<vector<float> > > &J2,
     int i0,int j0,int is){
 
   size_t iter=0;
@@ -2213,13 +2216,13 @@ double lpr(int cc,const vector<vector<vector<bool> > > &ai,const vector<vector<d
 
 // pseudo-L for PSL
 double lkhood_psl(int i0,int cc,const vector<vector<vector<bool> > > &ai,const vector<double> &h1,
-      const vector<vector<double> > &J1,double lambda){
+      const vector<vector<float> > &J1,double lambda){
 
   int nsnp=ai[0][0].size()/2;
   int nind[2]={int(ai[0].size()),int(ai[1].size())};
   int ntot= (cc<2 ? nind[cc] : nind[0]+nind[1]);
   double pan2(int nsnp,int i0,const vector<bool> &ci,vector<double> h1,
-    const vector<vector<double> > &J1);
+    const vector<vector<float> > &J1);
 
   double ln=0;
   if(cc<2){
@@ -2263,8 +2266,8 @@ double q2p(double x,int k){
    return f;
 }
 
-double invC(int nind,const vector<vector<double> > &f1,const vector<vector<vector<double> > > &f2,
-    double &lnz,vector<vector<double> > &h,vector<vector<vector<double> > > &J,double eps){
+double invC(int nind,const vector<vector<double> > &f1,const vector<vector<vector<float> > > &f2,
+    double &lnz,vector<vector<double> > &h,vector<vector<vector<float> > > &J,double eps){
 
   int nsnp=f1.size();
   int ndim=nsnp*L;
@@ -2274,9 +2277,9 @@ double invC(int nind,const vector<vector<double> > &f1,const vector<vector<vecto
   gsl_permutation *perm;
 
 #ifdef MPIP
-  double *mat;
+  float *mat;
   if(q_mfp)
-    mat=new double[ndim*ndim];      // parallel version using scaLAPACK
+    mat=new float[ndim*ndim];      // parallel version using scaLAPACK
   else{
 #endif
     A=gsl_matrix_alloc(ndim,ndim);   // serial version using GSL

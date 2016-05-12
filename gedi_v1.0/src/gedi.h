@@ -9,7 +9,7 @@ enum Model {DOM,REC,GEN,ADD};   // choice of models
 struct Theta{
   double alpha;
   std::vector<std::vector<double> > beta;
-  std::vector<std::vector<std::vector<double> > > gamm;
+  std::vector<std::vector<std::vector<float> > > gamm;
 };
 
 void il_tped(std::string &tped,std::string &tfam,std::string &meta_file,std::string &out_file,bool q_lr);
@@ -66,18 +66,18 @@ void pr_cl(std::ofstream &of,const std::vector<std::vector<std::vector<bool> > >
     std::vector<std::vector<double> > &risk);
 
 double lpr(int cc,const std::vector<std::vector<std::vector<bool> > > &ai,
-    const std::vector<std::vector<double> > &f1,const std::vector<std::vector<std::vector<double> > > &f2,double lamda,double z[3],std::vector<std::vector<double> > &h,std::vector<std::vector<std::vector<double> > > &J,int i,int j,int s);
+    const std::vector<std::vector<double> > &f1,const std::vector<std::vector<std::vector<float> > > &f2,double lamda,double z[3],std::vector<std::vector<double> > &h,std::vector<std::vector<std::vector<float> > > &J,int i,int j,int s);
 
 double lpr_psl(int i0,int cc,const std::vector<std::vector<std::vector<bool> > > &ai,
-    const std::vector<std::vector<double> > &f1,const std::vector<std::vector<std::vector<double> > > &f2,double lambda,std::vector<double> &h,std::vector<std::vector<double> > &J,int ifx,int jfx,int s);
+    const std::vector<std::vector<double> > &f1,const std::vector<std::vector<std::vector<float> > > &f2,double lambda,std::vector<double> &h,std::vector<std::vector<float> > &J,int ifx,int jfx,int s);
 
 double invC(int nind,const std::vector<std::vector<double> > &f1,
-    const std::vector<std::vector<std::vector<double> > > &f2,double &lnz,
-    std::vector<std::vector<double> > &h,std::vector<std::vector<std::vector<double> > > &J,
+    const std::vector<std::vector<std::vector<float> > > &f2,double &lnz,
+    std::vector<std::vector<double> > &h,std::vector<std::vector<std::vector<float> > > &J,
     double epsilon);
 
 void f12(int cc,const std::vector<std::vector<std::vector<bool> > > &ai,std::vector<std::vector<double> > &f1,
-    std::vector<std::vector<std::vector<double> > > &f2);
+    std::vector<std::vector<std::vector<float> > > &f2);
 
 void tped_read(std::string &tped,std::string &tfam,std::string &meta,std::string &par,int &nsample,
     std::vector<std::vector<int> > &nptr,std::vector<std::vector<std::vector<bool> > > &ai,
