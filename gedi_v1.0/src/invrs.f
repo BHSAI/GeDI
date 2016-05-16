@@ -12,7 +12,8 @@
 !-------------------------
       implicit none 
       integer   N,nb
-      real*8    mat(*)
+!     real*8    mat(*)
+      real*4    mat(*)
       integer   nproc,myid
 
 !  parameter constants
@@ -20,12 +21,12 @@
       parameter(max_al=10000000, max_bl=10000000,  max_vl=10000000)
 !  variables for definition of matrix A and matrix X
 !  local variables
-      real*8    al(max_al), bl(max_bl), rl(max_bl)
-      real*8    ai(max_bl)
+      real*4    al(max_al), bl(max_bl), rl(max_bl)
+      real*4    ai(max_bl)
       integer   ctxt, ctxt_sys, ctxt_all, 
      :          nprow, npcol, myrow, mycol,
-     :          m_al, n_al, m_bl, n_bl, m_cl, 
-     :          llda, lldb, lldc, desc_A(9), desc_B(9),
+     :          m_al, n_al, m_bl, n_bl,
+     :          llda, lldb, desc_A(9), desc_B(9),
      :          ncheck, k,l,
      :          irhs, ipr, ipc, il, jl, i, j, info, vl(max_vl),  
      :          NUMROC, INDXL2G, INDXG2L, INDXG2P
@@ -65,7 +66,7 @@
       end if 
 
 ! initializing descriptors for the distributed matrices A, B:
-      llda = max(1,m_al); lldb = max(1,m_bl); lldc = max(1,m_cl)
+      llda = max(1,m_al); lldb = max(1,m_bl)
       call DESCINIT( desc_A, n, n, nb, nb,0,0, ctxt, llda, info )
       call DESCINIT( desc_B, n, n, nb, nb,0,0, ctxt, lldb, info )
 
@@ -92,7 +93,7 @@
       end do
 
 ! solve the systems of equations
-      call PDGESV(n,n,al,1,1,desc_A,vl,bl,1,1,desc_B,info)
+      call PSGESV(n,n,al,1,1,desc_A,vl,bl,1,1,desc_B,info)
 
 !     call BLACS_EXIT(1); stop
 
@@ -102,7 +103,7 @@
             m_bl = NUMROC(n,nb,i,0,nprow)
             n_bl = NUMROC(n,nb,j,0,npcol)
             if(i.ne.0 .or. j.ne.0) then
-              call dgerv2d(ctxt,m_bl,n_bl,ai,m_bl,i,j)
+              call sgerv2d(ctxt,m_bl,n_bl,ai,m_bl,i,j)
 !             write(*,*)'recvd',myid
             endif
             do jl=1,n_bl
@@ -125,7 +126,7 @@
             k = INDXL2G(il,nb,myrow,0,nprow)
           enddo
         enddo
-        call dgesd2d(ctxt,m_bl,n_bl,bl,m_bl,0,0)
+        call sgesd2d(ctxt,m_bl,n_bl,bl,m_bl,0,0)
 !       write(*,*)'sent',myid
       endif
 
