@@ -958,8 +958,10 @@ void par_out(ofstream &of,const vector<string> &rs,double dev,int nsig,
 //double df=nsample*nsig*(nsig+1)/2;
   double df=nsample*(L*nsig+L*L*nsig*(nsig-1)/2);
   cout << "Degrees of freedom: " << df << endl;
-  double lnp= (dev>=0 ? gsl_sf_gamma_inc_Q(0.5*df,dev/2) : 1 );
-  cout << "p-value: " << lnp << endl << endl;
+  if(q_pout){
+    double lnp= (dev>=0 ? gsl_sf_gamma_inc_Q(0.5*df,dev/2) : 1 );
+    cout << "p-value: " << lnp << endl << endl;
+  }
 
   double Pd=0;
   double teff=0;
