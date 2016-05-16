@@ -34,6 +34,7 @@ extern vector<double> eps;
 extern double Lh;        // penalizer for h
 extern int Npr;
 const int Npr2=10;
+extern float Max_mem;    // maximum memory allowed
 extern bool q_minor_ctl; // true if minor allele define wrt control only
 extern double Prev;      // disease prevalence
 extern double pcut;      // p-value cutoff
@@ -1152,6 +1153,11 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,bool q_qi,
   if(!q_marg) nsp=1;                         // not doing marginal: save memory
   h.resize(nsp);
   J.resize(nsp);
+  float mem=nsp*3*nsnp*(L*sizeof(double)+(nsnp-1)*L*L*sizeof(float)/2);  // memory required
+  if(mem>Max_mem){
+    if(master) cerr << "Maximum memory exceeded. Bye!\n";
+    end();
+  }
   for(int s=0;s<nsp;s++){
     f1[s].resize(3);
     f2[s].resize(3);

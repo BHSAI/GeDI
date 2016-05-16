@@ -44,7 +44,7 @@ string bfile="";           // binary data file prefix
 int ncv=5;                 // order of cross-validation
 int meta=1;                // no. of samples in meta-analysis
 int Npr=10000;             // print freq. for tped SNP numbers
-int nproc=0;               // no. of processors
+int nproc=1;               // no. of processors
 int rank=0;                // processor rank
 bool master=true;          // master process
 int Chr=0;                 // chromosome no. (1-based)
@@ -52,7 +52,8 @@ long Start=-1;             // starting position (1-based)
 long End=-1;               // end position (1-based)
 bool q_boot=false;         // flag for boostrapping
 bool q_strict=false;       // flag for being strict
-int Seed=1;             // random no. seed
+int Seed=1;                // random no. seed
+float Max_mem=1.0e6;       // maximum memory
 
 void estop(int ecode){
    
