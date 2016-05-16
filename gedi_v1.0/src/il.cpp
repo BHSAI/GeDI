@@ -250,7 +250,7 @@ void il_bed(string &meta,string &out_file,bool q_lr){
       int nctrl=nptr[s+1][0]-nptr[s][0];
 //    int nsize=nptr[s+1][0]+nptr[s+1][1]-nptr[s][0]-nptr[s][1];
       int nsize=ncase+nctrl;
-      int nbyte=ceil(nsize/4.);              // no. of bytes for each snp
+      int nbyte=int(ceil(nsize/4.));              // no. of bytes for each snp
       double neff=2.0/sqrt(1.0/ncase+1.0/nctrl);  // effective sample size weight
       char *data=new char[nbyte];
       string gi0="";
@@ -1386,7 +1386,7 @@ void il_bpr(string &meta_file,string &out_file,string &par_file,bool q_lr){
       int ncase=nptr[s+1][1]-nptr[s][1];
       int nctrl=nptr[s+1][0]-nptr[s][0];
       int nsize=ncase+nctrl;
-      int nbyte=ceil(nsize/4.);              // no. of bytes for each snp
+      int nbyte=int(ceil(nsize/4.));              // no. of bytes for each snp
       char *data=new char[nbyte];
       string gi0="";
       string gi1="";

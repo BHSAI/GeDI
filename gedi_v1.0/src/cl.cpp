@@ -1395,7 +1395,7 @@ void marginal(const vector<vector<vector<vector<bool> > > > &ai,
     }
     double qi=2*(lkl-v);
     if(qi<0) qi=0;
-    double df=nsample*L;
+    int df=nsample*L;
     if(q_pi){
       pi[i]= q2p(qi,df);
       cout << " SNP#" << setw(4) << i+1 << " " << rs[i] << " p-value: " << pi[i] << endl;
@@ -1471,7 +1471,7 @@ void marginal(const vector<vector<vector<vector<bool> > > > &ai,
     }
     double qij=2*(lkl-v);
     if(qij<0) qij=0;
-    double df=L*L*nsample;
+    int df=L*L*nsample;
     if(q_pij){
       pij[i][j]= q2p(qij,df);
       cout << "(" << i+1 << " " << rs[i] << "," << j+1 << " " << rs[j] 
