@@ -57,7 +57,7 @@ void read_par_cl(const std::vector<std::vector<std::vector<bool> > > &ai,const s
 
 double cl_gdi(const std::vector<std::vector<std::vector<std::vector<bool> > > > &av,
     bool q_qi,const std::vector<std::string> &rs,double lambda,
-    const std::vector<std::vector<int> > &nptr,Theta th[]);
+    const std::vector<std::vector<int> > &nptr,Theta &th);
 
 double cl_dlr(const std::vector<std::string> &rs,
     const std::vector<std::vector<std::vector<bool> > > &ai,double lambda,Theta &th,bool q_qi);
@@ -91,17 +91,24 @@ void bin_read(std::string &meta,int &nsample,std::vector<std::vector<int> > &npt
     std::vector<std::vector<std::vector<bool> > > &ai,std::vector<std::string> &rs,
     const std::vector<std::string> &exc_list);
 
+void par_out(std::ofstream &of,const std::vector<std::string> &ra,double dev,int nsig,
+      const std::vector<std::vector<std::vector<std::vector<bool> > > > &aw,Theta &th);
+
 void byte2bit(char dat,int bit[8]);
 
 void estop(int ecode);
 
 void sample(int N,int n,std::vector<int> &n1);
 
+void marginal(const std::vector<std::vector<std::vector<std::vector<bool> > > > &ai,
+    const std::vector<std::vector<std::vector<std::vector<double> > > > &f1,const std::vector<std::vector<std::vector<std::vector<std::vector<float> > > > > &f2,
+    const std::vector<std::string> &rs,double lkl,double z[3],double lambda,const std::vector<std::vector<int> > &nptr);
+
 struct Par{
   const std::vector<std::vector<std::vector<bool> > > &ai;
   const std::vector<std::string> &rs;
   bool q_qi;
-  Theta* th;
+  Theta &th;
 };
 
 void end();

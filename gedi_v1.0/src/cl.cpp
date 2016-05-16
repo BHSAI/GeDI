@@ -220,48 +220,21 @@ void read_par_cl(const vector<vector<vector<bool> > > &ai,const string &par,
     prf.close();
 }
 
-void pr_cl(ofstream &of,const vector<vector<vector<vector<bool> > > > &ai,Theta *th,
+void pr_cl(ofstream &of,const vector<vector<vector<vector<bool> > > > &ai,Theta &th,
     vector<vector<double> > &risk){
 
   int nsample=ai.size();
-  double alpha=0;
-  int nsnp=ai[0][0][0].size()/2;
-  vector<vector<double> > beta(nsnp);
-  vector<vector<vector<double> > > gamm(nsnp);
-  for(int i=0;i<nsnp;i++){
-    beta[i].resize(L);
-    gamm[i].resize(nsnp);
-    for(int j=0;j<nsnp;j++) gamm[i][j].resize(L*L);
-  }
-
-  double teff=0;
-  for(int s=0;s<nsample;s++){
-    double neff=2.0/sqrt(1.0/ai[s][0].size()+1.0/ai[s][1].size());
-    alpha+=th[s].alpha*neff;
-    for(int i=0;i<nsnp;i++) for(int l1=0;l1<L;l1++){
-      beta[i][l1]+=th[s].beta[i][l1]*neff;
-      for(int j=0;j<nsnp;j++) for(int l2=0;l2<L;l2++)
-        gamm[i][j][2*l1+l2]+=th[s].gamm[i][j][2*l1+l2]*neff;
-    }
-    teff+=neff;
-  }
-  alpha/=teff;
-  for(int i=0;i<nsnp;i++) for(int l1=0;l1<L;l1++){
-    beta[i][l1]/=teff;
-    for(int j=0;j<nsnp;j++) for(int l2=0;l2<L;l2++)
-      gamm[i][j][2*l1+l2]/=teff;
-  }
 
   for(int s=0;s<nsample;s++){
     int nind[2]={int(ai[s][0].size()),int(ai[s][1].size())};
     int nsnp=ai[s][0][0].size()/2;
     for(int y=0;y<2;y++) for(int n=0;n<nind[y];n++){
-      double h=alpha;
+      double h=th.alpha;
       for(int i=0;i<nsnp;i++){
         int a=2*ai[s][y][n][2*i]+ai[s][y][n][2*i+1];
         int ia=code(a,model);
         if(ia==0) continue;
-        h+=beta[i][ia-1];
+        h+=th.beta[i][ia-1];
         for(int j=i+1;j<nsnp;j++){
           int b=2*ai[s][y][n][2*j]+ai[s][y][n][2*j+1];
           int jb=code(b,model);
@@ -270,7 +243,8 @@ void pr_cl(ofstream &of,const vector<vector<vector<vector<bool> > > > &ai,Theta 
 //        if(ia==1 && jb==2) id=1                id=2*(ia-1)+jb-1
 //        if(ia==2 && jb==1) id=2
 //        if(ia==2 && jb==2) id=3
-          h+=(gamm[i][j][2*(ia-1)+jb-1]+gamm[j][i][2*(jb-1)+ia-1])/2;
+//        h+=(th.gamm[i][j][2*(ia-1)+jb-1]+th.gamm[j][i][2*(jb-1)+ia-1])/2;
+          h+=th.gamm[i][j][2*(ia-1)+jb-1];
         }
       }
       double p=1.0/(1+exp(-h));
@@ -867,7 +841,7 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
   if(master) of.open(out_file.c_str(),ios::out);
 
   vector<vector<double> > risk;                  // (risk,y) 
-  Theta *th=new Theta[nsample];
+  Theta th;
 
   vector<double> para;
   if(q_mf)
@@ -881,7 +855,7 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
     if(master) ocv.open("gedi.auc",ios::out);
     if(!q_cv){
       vector<vector<vector<vector<bool> > > > av(1);   // genotype subset from snps in parameter file
-      read_par_cl(ai,par,av[0],rs,th[0]);        // read parameters
+      read_par_cl(ai,par,av[0],rs,th);        // read parameters
       pr_cl(of,av,th,risk);                // do prediction
       sort(risk.begin(),risk.end(),comp);
       roc(ocv,risk);
@@ -916,7 +890,7 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
           else
             for(int s=0;s<nsample;s++){
               if(nsample>1) if(master) cout <<"Sample #" << s+1 << ": \n";
-              dev+=cl_dlr(ra,av[s],para[k],th[s],q_qi);
+              dev+=cl_dlr(ra,av[s],para[k],th,q_qi);
             }
           if(master) cout << "Collective likelihood ratio statistic: " << dev << endl;
           if(q_pout){
@@ -964,22 +938,19 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
     end();
   }
   double dev=0;
-  void par_out(ofstream &of,const vector<string> &ra,double dev,int nsig,
-      const vector<vector<vector<vector<bool> > > > &aw,Theta *th);
   for(unsigned int k=0;k<para.size();k++){
     if(q_ee || q_mf || q_pl)
       dev=cl_gdi(aw,q_qi,ra,para[k],nptr,th);  // GDI
     else
       for(int s=0;s<nsample;s++)
-        dev+=cl_dlr(ra,aw[s],para[k],th[s],q_qi);  // LR
+        dev+=cl_dlr(ra,aw[s],para[k],th,q_qi);  // LR
     if(master) par_out(of,ra,dev,nsig,aw,th);
   }
   if(master) of.close();
-  delete[] th;
 }
 
 void par_out(ofstream &of,const vector<string> &rs,double dev,int nsig,
-    const vector<vector<vector<vector<bool> > > > &aw,Theta *th){
+    const vector<vector<vector<vector<bool> > > > &aw,Theta &th){
 
   cout << "Collective likelihood ratio statistic: " << dev << endl;
   int nsample=aw.size();
@@ -989,16 +960,7 @@ void par_out(ofstream &of,const vector<string> &rs,double dev,int nsig,
   double lnp= (dev>=0 ? gsl_sf_gamma_inc_Q(0.5*df,dev/2) : 1 );
   cout << "p-value: " << lnp << endl << endl;
 
-  double alpha=0;
   double Pd=0;
-  int nsnp=aw[0][0][0].size()/2;
-  vector<vector<double> > beta(nsnp);
-  vector<vector<vector<double> > > gamm(nsnp);
-  for(int i=0;i<nsnp;i++){
-    beta[i].resize(L);
-    gamm[i].resize(nsnp);
-    for(int j=0;j<nsnp;j++) gamm[i][j].resize(L*L);
-  }
   double teff=0;
   for(int s=0;s<nsample;s++){
     vector<vector<double> > f1;
@@ -1006,38 +968,26 @@ void par_out(ofstream &of,const vector<string> &rs,double dev,int nsig,
     for(int y=0;y<2;y++) f12(y,aw[s],f1,f2);              // calculate mean frqs
     int nind[2]={int(aw[s][0].size()),int(aw[s][1].size())};
     double neff=2.0/sqrt(1.0/nind[0]+1.0/nind[1]);
-    alpha+=th[s].alpha*neff;
     Pd+=double(nind[1])/(nind[0]+nind[1])*neff;
-    for(int i=0;i<nsnp;i++) for(int l1=0;l1<L;l1++){
-      beta[i][l1]+=th[s].beta[i][l1]*neff;
-      for(int j=0;j<nsnp;j++) for(int l2=0;l2<L;l2++)
-        gamm[i][j][2*l1+l2]+=th[s].gamm[i][j][2*l1+l2]*neff;
-    }
     teff+=neff;
   }
-  alpha/=teff;
   Pd/=teff;
-  for(int i=0;i<nsnp;i++) for(int l1=0;l1<L;l1++){
-    beta[i][l1]/=teff;
-    for(int j=0;j<nsnp;j++) for(int l2=0;l2<L;l2++)
-      gamm[i][j][2*l1+l2]/=teff;
-  }
 
-  of << "alpha: " << setw(12) << alpha << " Pd: " << setw(12) << Pd << endl;
+  of << "alpha: " << setw(12) << th.alpha << " Pd: " << setw(12) << Pd << endl;
   for(int i=0;i<nsig;i++) for(int l0=0;l0<L;l0++){
     of << left;
     of << setw(15) << rs[i] << " ";
     of << right;
     for(int j=0;j<i;j++) for(int l1=0;l1<L;l1++)
-      of << setw(11) << gamm[i][j][2*l0+l1] << " ";
+      of << setw(11) << th.gamm[i][j][2*l0+l1] << " ";
     for(int l1=0;l1<L;l1++){
       if(l0==l1)
-        of << setw(11) << beta[i][l0] << " ";
+        of << setw(11) << th.beta[i][l0] << " ";
       else
         of << setw(11) << 0 << " ";
     }
     for(int j=i+1;j<nsig;j++) for(int l1=0;l1<L;l1++)
-      of << setw(11) << gamm[i][j][2*l0+l1] << " ";
+      of << setw(11) << th.gamm[i][j][2*l0+l1] << " ";
     of << endl;
   }
 }
@@ -1175,7 +1125,7 @@ void snp_select(const vector<vector<vector<bool> > > &ai,int nv,
 // performs cl DDA inference
 
 double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,bool q_qi,
-    const vector<string> &rs,double lambda,const vector<vector<int> > &nptr,Theta th[]){
+    const vector<string> &rs,double lambda,const vector<vector<int> > &nptr,Theta &th){
 
   double qtot=0;
   double z[3]={0,};
@@ -1198,21 +1148,20 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,bool q_qi,
   int istop=nsnp;
 #endif
 
-  h.resize(nsample);
-  J.resize(nsample);
-  for(int s=0;s<nsample;s++){
+  int nsp=nsample;
+  if(!q_marg) nsp=1;                         // not doing marginal: save memory
+  h.resize(nsp);
+  J.resize(nsp);
+  for(int s=0;s<nsp;s++){
     f1[s].resize(3);
     f2[s].resize(3);
     h[s].resize(3);
     J[s].resize(3);
-    th[s].beta.resize(nsnp);
-    th[s].gamm.resize(nsnp);
     for(int y=0;y<3;y++){
       h[s][y].resize(nsnp);
       J[s][y].resize(nsnp);
     }
     for(int i=0;i<nsnp;i++){
-      th[s].gamm[i].resize(nsnp);
       for(int y=0;y<3;y++){
         J[s][y][i].resize(nsnp);
         h[s][y][i].resize(L);
@@ -1229,29 +1178,31 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,bool q_qi,
     if(master) cout << "DDA inference with epsilon = " << lambda << endl;
 
   double lnz[3]={0,};
+  double teff=0;
   for(int s=0;s<nsample;s++){  // loop over samples
+    int si= (q_marg? s : 0);
     if(nsample>1)
      if(master) cout << "Sample # " << s+1 << ": \n";
     int nind[2]={int(ai[s][0].size()),int(ai[s][1].size())};
 
     for(int y=0;y<3;y++)
-      f12(y,ai[s],f1[s][y],f2[s][y]);      // calculate frequencies
+      f12(y,ai[s],f1[si][y],f2[si][y]);      // calculate frequencies
   
     if(!q_pl){
       double lks=0;   // sum within a sample
       for(int y=0;y<2;y++){
         if(q_ee){
-          lks+=lpr(y,ai[s],f1[s][y],f2[s][y],lambda,z,h[s][y],J[s][y],-1,-1,s);     // EE
+          lks+=lpr(y,ai[s],f1[si][y],f2[si][y],lambda,z,h[si][y],J[si][y],-1,-1,s);     // EE
           lnz[y]=log(z[y]);
         }
         else
-          lks+=invC(nind[y],f1[s][y],f2[s][y],lnz[y],h[s][y],J[s][y],lambda); 
+          lks+=invC(nind[y],f1[si][y],f2[si][y],lnz[y],h[si][y],J[si][y],lambda); 
                    // MFA (returns Hy/n)
       }
       if(q_ee)
-        qtot+=2*(lks-lpr(2,ai[s],f1[s][2],f2[s][2],lambda,z,h[s][2],J[s][2],-1,-1,s));
+        qtot+=2*(lks-lpr(2,ai[s],f1[si][2],f2[si][2],lambda,z,h[si][2],J[si][2],-1,-1,s));
       else   // MFA
-        qtot+=2*(lks-invC(nind[0]+nind[1],f1[s][2],f2[s][2],lnz[2],h[s][2],J[s][2],lambda));
+        qtot+=2*(lks-invC(nind[0]+nind[1],f1[si][2],f2[si][2],lnz[2],h[si][2],J[si][2],lambda));
       lkl+=lks;
     }
     else{                           // pseudo-L
@@ -1269,23 +1220,23 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,bool q_qi,
       for(int i=istart;i<istop;i++){
         double lki=0;
         for(int y=0;y<2;y++){
-          lki+=lpr_psl(i,y,ai[s],f1[s][y],f2[s][y],lambda,h[s][y][i],J[s][y][i],-1,-1,s);
+          lki+=lpr_psl(i,y,ai[s],f1[si][y],f2[si][y],lambda,h[si][y][i],J[si][y][i],-1,-1,s);
           for(int k=0;k<nind[y];k++){
             double z=1;
             for(int l0=0;l0<L;l0++){
-              double sum=h[s][y][i][l0];
+              double sum=h[si][y][i][l0];
               for(int j=0;j<nsnp;j++){
                 if(i==j) continue;
                 int a=code(2*ai[s][y][k][2*j]+ai[s][y][k][2*j+1],model);
                 if(a>0)
-                  sum+=J[s][y][i][j][2*l0+a-1]/2;
+                  sum+=J[si][y][i][j][2*l0+a-1]/2;
               }
               z+=exp(sum);
             }
             lns[y]+=log(z);
           }
         }
-        double q=2*(lki-lpr_psl(i,2,ai[s],f1[s][2],f2[s][2],lambda,h[s][2][i],J[s][2][i],-1,-1,s));
+        double q=2*(lki-lpr_psl(i,2,ai[s],f1[si][2],f2[si][2],lambda,h[si][2][i],J[si][2][i],-1,-1,s));
         lks+=lki;
         qtos+=q;
         if((i+1)%Npr2==0) cout << "Inference for SNP #" << i+1 << "...\n";
@@ -1293,9 +1244,9 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,bool q_qi,
 #ifdef MPIP
       int idata=0;   // pack data
       for(int i=istart;i<istop;i++) for(int y=0;y<3;y++) for(int l0=0;l0<L;l0++){
-        data[idata++]=h[s][y][i][l0];
+        data[idata++]=h[si][y][i][l0];
         for(int j=0;j<nsnp;j++) for(int l1=0;l1<L;l1++)
-          if(j!=i) data[idata++]=J[s][y][i][j][2*l0+l1];
+          if(j!=i) data[idata++]=J[si][y][i][j][2*l0+l1];
       }
       if(istart<istop){
         data[idata++]=lns[0];
@@ -1310,9 +1261,9 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,bool q_qi,
         for(int i=k*isnp;i<(k+1)*isnp;i++){
           if(i>=nsnp) break;
           for(int y=0;y<3;y++) for(int l0=0;l0<L;l0++){
-            h[s][y][i][l0]=data0[idata++];
+            h[si][y][i][l0]=data0[idata++];
             for(int j=0;j<nsnp;j++) for(int l1=0;l1<L;l1++)
-              if(j!=i) J[s][y][i][j][2*l0+l1]=data0[idata++];
+              if(j!=i) J[si][y][i][j][2*l0+l1]=data0[idata++];
           }
         }
         if(idata>=ndata*nproc) break;
@@ -1333,36 +1284,48 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,bool q_qi,
     }
 
     double Pd=double(nind[1])/(nind[0]+nind[1]); // disease prevalence
-    th[s].alpha=log(Pd/(1-Pd))+lnz[0]-lnz[1]; 
+    double neff=2.0/sqrt(1.0/nind[0]+1.0/nind[1]);  // sample average weight
+    th.alpha+=(log(Pd/(1-Pd))+lnz[0]-lnz[1])*neff; 
+    if(s==0){
+      th.beta.resize(nsnp);
+      th.gamm.resize(nsnp);
+      for(int i=0;i<nsnp;i++){
+        th.beta[i].resize(L);
+        th.gamm[i].resize(nsnp);
+        for(int j=0;j<nsnp;j++)
+          th.gamm[i][j].resize(L*L);
+      }
+    }
 
     for(int i=0;i<nsnp;i++){
-      th[s].gamm[i].resize(nsnp);
-      for(int j=0;j<nsnp;j++)
-        th[s].gamm[i][j].resize(L*L);
-    }
-    for(int i=0;i<nsnp;i++){
-      th[s].beta[i].resize(L);
       for(int l0=0;l0<L;l0++){
-        th[s].beta[i][l0]=h[s][1][i][l0]-h[s][0][i][l0];
+        th.beta[i][l0]+=(h[si][1][i][l0]-h[si][0][i][l0])*neff;
         for(int j=i+1;j<nsnp;j++) for(int l1=0;l1<L;l1++){
-          th[s].gamm[i][j][2*l0+l1]=J[s][1][i][j][2*l0+l1]-J[s][0][i][j][2*l0+l1];
-          if(!q_pl)
-            th[s].gamm[j][i][2*l1+l0]=th[s].gamm[i][j][2*l0+l1];
-          else
-            th[s].gamm[j][i][2*l1+l0]=J[s][1][j][i][2*l1+l0]-J[s][0][j][i][2*l1+l0];
+          th.gamm[i][j][2*l0+l1]+=(J[si][1][i][j][2*l0+l1]-J[si][0][i][j][2*l0+l1])*neff;
+          th.gamm[j][i][2*l1+l0]=th.gamm[i][j][2*l0+l1];
         }
       }
     }
+    teff+=neff;
+  }  // end of loop over samples
+  th.alpha/=teff;
+  for(int i=0;i<nsnp;i++) for(int l0=0;l0<L;l0++){
+    th.beta[i][l0]/=teff;
+    for(int j=i+1;j<nsnp;j++) for(int l1=0;l1<L;l1++){
+      th.gamm[i][j][2*l0+l1]/=teff;
+      th.gamm[j][i][2*l1+l0]/=teff;
+    }
   }
+  for(int i=0;i<nsnp;i++) for(int l0=0;l0<L;l0++)
+    for(int j=i+1;j<nsnp;j++) for(int l1=0;l1<L;l1++){
+      double t=(th.gamm[i][j][2*l0+l1]+th.gamm[j][i][2*l1+l0])/2;
+      th.gamm[i][j][2*l0+l1]=th.gamm[j][i][2*l1+l0]=t;
+    }
 
   if(master) cout << endl;
 
-  void marginal(const vector<vector<vector<vector<bool> > > > &ai,
-    const vector<vector<vector<vector<double> > > > &f1,const vector<vector<vector<vector<vector<float> > > > > &f2,
-    const vector<string> &rs,double lkl,double z[3],double lambda,const vector<vector<int> > &nptr,
-    Theta th[]);
   if(q_marg)
-    marginal(ai,f1,f2,rs,lkl,z,lambda,nptr,th);
+    marginal(ai,f1,f2,rs,lkl,z,lambda,nptr);
 
   return qtot;
 }
@@ -1372,7 +1335,7 @@ void marginal(const vector<vector<vector<vector<bool> > > > &ai,
     const vector<vector<vector<vector<double> > > > &f1,
     const vector<vector<vector<vector<vector<float> > > > > &f2,
     const vector<string> &rs,double lkl,double z[3],
-    double lambda,const vector<vector<int> > &nptr,Theta th[]){
+    double lambda,const vector<vector<int> > &nptr){
 
   int nsample=ai.size();
   int nsnp=ai[0][0][0].size()/2;
@@ -1612,18 +1575,22 @@ void f12(int cc,const vector<vector<vector<bool> > > &ai,vector<vector<double> >
   
   int nc=0;
   for(int i=0;i<nsnp;i++){
+    f1[i].resize(L);
     f2[i].resize(nsnp);
     for(int l=0;l<L;l++)
-      f1[i].push_back((q_mf ? 1.0/(L+1) : 0));   // MFA: prior count of 1 ind. with uniform distr
-    for(int j=0;j<nsnp;j++) for(int l0=0;l0<L;l0++) for(int l1=0;l1<L;l1++){
-      double x=0;
-      if(q_mf){
-        if(i==j)
-          x=(l0==l1 ? 1.0/(L+1) : 0);
-        else
-          x=1.0/(L+1)/(L+1);
+      f1[i][l]=(q_mf ? 1.0/(L+1) : 0);   // MFA: prior count of 1 ind. with uniform distr
+    for(int j=0;j<nsnp;j++){
+      f2[i][j].resize(L*L);
+      for(int l0=0;l0<L;l0++) for(int l1=0;l1<L;l1++){
+        double x=0;
+        if(q_mf){
+          if(i==j)
+            x=(l0==l1 ? 1.0/(L+1) : 0);
+          else
+            x=1.0/(L+1)/(L+1);
+        }
+        f2[i][j][2*l0+l1]=x;
       }
-      f2[i][j].push_back(x);
     }
   }
   if(q_mf) nc=1;
