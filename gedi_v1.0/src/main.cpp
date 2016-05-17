@@ -390,6 +390,10 @@ int main(int argc,char* argv[]){
        if(master) cerr << "Please specify only one among -pseudo, -ee, -mf, -lr. Bye!\n";
        end();
      }
+     if(q_lr & (q_meta || q_metab)){
+       if(master) cerr << "CL meta analysis with logistic regresion not implemented. Bye!\n";
+       end();
+     }
      if(q_pr){
        if(master) cout << "Prediction mode\n\n";
        if(q_par){
