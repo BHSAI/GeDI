@@ -1187,6 +1187,7 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,bool q_qi,
 
   double lnz[3]={0,};
   double teff=0;
+  th.alpha=0;
   for(int s=0;s<nsample;s++){  // loop over samples
     int si= (q_marg? s : 0);
     if(nsample>1)
@@ -1299,9 +1300,12 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,bool q_qi,
       th.gamm.resize(nsnp);
       for(int i=0;i<nsnp;i++){
         th.beta[i].resize(L);
+        fill(th.beta[i].begin(),th.beta[i].end(),0);
         th.gamm[i].resize(nsnp);
-        for(int j=0;j<nsnp;j++)
+        for(int j=0;j<nsnp;j++){
           th.gamm[i][j].resize(L*L);
+          fill(th.gamm[i][j].begin(),th.gamm[i][j].end(),0);
+        }
       }
     }
 
