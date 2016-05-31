@@ -501,7 +501,7 @@ void bin_read(string &meta,int &nsample,vector<vector<int> > &nptr,
 
     for(int s=0;s<nsample;s++){
       int nsize=nptr[s+1][0]+nptr[s+1][1]-nptr[s][0]-nptr[s][1];
-      int nbyte=ceil(nsize/4.);  // no. of bytes for each snp
+      int nbyte=int(ceil(nsize/4.));  // no. of bytes for each snp
       char *data=new char[nbyte];
       string gi0="";
       string gi1="";
