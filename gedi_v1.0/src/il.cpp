@@ -667,17 +667,18 @@ bool assoc(double f1[2][2],int nind[2],double &q,double &alpha,double beta[]){
          f+=f1[y][a];
        }
        if(f<0) estop(94);
-       s+=(1-f)*log(1-f);
+       s+=(f<1 ? (1-f)*log(1-f) : 0);
        q+=2*nind[y]*s;
      }
      s=0; f=0;
      for(int a=0;a<2;a++){
        if(ft[a]<0) estop(38);
-       s+=ft[a]*log(ft[a]);
+//     s+=ft[a]*log(ft[a]);
+       s+=(ft[a]>0 ? ft[a]*log(ft[a]) : 0);
        f+=ft[a];
      }
      if(f<0) estop(94);
-     s+=(1-f)*log(1-f);
+     s+=(f<1 ? (1-f)*log(1-f) : 0);
      q-=2*ntot*s;
      alpha=log(f1[1][0]/f1[0][0]);
      for(int a=0;a<2;a++){
@@ -719,7 +720,7 @@ bool assoc(double f1[2][2],int nind[2],double &q,double &alpha,double beta[]){
      for(int y=0;y<2;y++){
        if(s[y]<0) 
          estop(83);
-       if(s[y]>0){
+       if(s[y]>0 && s[y]<1){
          if(model==ADD)
            q+=2*nind[y]*(s[y]*log(x[y])-s0*log(x0)-log((1+x[y]+x[y]*x[y])/(1+x0+x0*x0)));
          else   // DOM or REC
@@ -729,7 +730,7 @@ bool assoc(double f1[2][2],int nind[2],double &q,double &alpha,double beta[]){
      if(s0<0) 
        estop(92);
      if(model==DOM || model==REC){
-       if(s0>0) q-=2*ntot*(s0*log(s0)+(1-s0)*log(1-s0));
+       if(s0>0 && s0<1) q-=2*ntot*(s0*log(s0)+(1-s0)*log(1-s0));
        alpha=log((1-s[1])/(1-s[0]));
        beta[0]=s[1]/(1-s[1]);
        beta[0]/=s[0]/(1-s[0]);
@@ -837,9 +838,11 @@ void freq(int nmiss[],const string &gi0,const string &gi1,const vector<short> &p
       }
     }
   }
-  if( (major!=code[g0] && major!=code[g1]) || (minor!=code[g0] && minor!=code[g1])){
+  if(g1>=0 && minor!='?'){
+    if( (major!=code[g0] && major!=code[g1]) || (minor!=code[g0] && minor!=code[g1])){
     if(master) cerr << "Major/minor allele mismatch.\n";
     end();
+   }
   }
 
 //   ctl  g0 case g0
@@ -1045,6 +1048,7 @@ void infer_par(int nv,const vector<vector<vector<bool> > > &ai,double &alpha,
       if(i%Npr==0) cout << "inferring parameters for " << i << "'th SNP:\n";
   }
   double prev=double(nind[1])/(nind[0]+nind[1]);
+  if(Prev>0) prev=Prev;
   alpha+=log(prev/(1-prev));
 
 }
@@ -1591,7 +1595,9 @@ void snp_select_il(const vector<vector<vector<bool> > > &ai,int nv,
     bets[0]/=teff;
     bets[1]/=teff;
     double df=L*nscount;
-    double pv= (qtot>0 ? gsl_sf_gamma_inc_Q(0.5*df,qtot/2) : 1);   // DOM or REC
+//  double pv= (qtot>0 ? gsl_sf_gamma_inc_Q(0.5*df,qtot/2) : 1);   // DOM or REC
+    if(qtot<=0) continue;
+    double pv= gsl_sf_gamma_inc_Q(0.5*df,qtot/2);
     if(pv>pcut) continue;
     alpha+=alps/teff;
     beta1.push_back(bets[0]);
@@ -1608,6 +1614,7 @@ void snp_select_il(const vector<vector<vector<bool> > > &ai,int nv,
     int nctrl=nptr[s+1][0]-nptr[s][0];
     double neff=2.0/sqrt(1.0/ncase+1.0/nctrl);  // effective sample size weight
     double prev=double(nc[s][1])/(nc[s][0]+nc[s][1]);
+    if(Prev>0) prev=Prev;
     da+=log(prev/(1-prev))*neff;
     teff+=neff;
     av[s].resize(2);
