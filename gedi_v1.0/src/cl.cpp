@@ -340,6 +340,16 @@ void bin_read(string &meta,int &nsample,vector<vector<int> > &nptr,
     }
     string line;
     int nc=0;
+    if(s>0){
+      if(nind[0]==0){
+        if(master) cout << "No. of ctrl = 0. Bye!\n";
+        end();
+      }
+      if(nind[1]==0){
+        if(master) cout << "No. of case = 0. Bye!\n";
+        end();
+      }
+    }
     nptr[s].push_back(nind[0]);
     nptr[s].push_back(nind[1]);
     while(getline(file,line)){
@@ -630,6 +640,16 @@ void tped_read(string &tped,string &tfam,string &meta,string &par,int &nsample,
     }
     string line;
     int nc=0;
+    if(s>0){
+      if(nind[0]==0){
+        if(master) cout << "No. of ctrl = 0. Bye!\n";
+        end();
+      }
+      if(nind[1]==0){
+        if(master) cout << "No. of case = 0. Bye!\n";
+        end();
+      }
+    }
     nptr[s].push_back(nind[0]);
     nptr[s].push_back(nind[1]);
     while(getline(tf,line)){
@@ -1095,7 +1115,9 @@ void snp_select(const vector<vector<vector<bool> > > &ai,int nv,
     }
     if(nscount==0) continue;
     double df=L*nscount;
-    double pv= (qtot>0 ? gsl_sf_gamma_inc_Q(0.5*df,qtot/2) : 1);   // DOM or REC
+//  double pv= (qtot>0 ? gsl_sf_gamma_inc_Q(0.5*df,qtot/2) : 1);   // DOM or REC
+    if(qtot<=0) continue;
+    double pv= gsl_sf_gamma_inc_Q(0.5*df,qtot/2);
     if(pv>pcut) continue;
     slist.push_back(i);
     ra.push_back(rs[i]);
@@ -1293,6 +1315,7 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,bool q_qi,
     }
 
     double Pd=double(nind[1])/(nind[0]+nind[1]); // disease prevalence
+    if(Prev>0) Pd=Prev;
     double neff=2.0/sqrt(1.0/nind[0]+1.0/nind[1]);  // sample average weight
     th.alpha+=(log(Pd/(1-Pd))+lnz[0]-lnz[1])*neff; 
     if(s==0){

@@ -80,6 +80,17 @@ void read_bfm(vector<string> &mbfile,const string& meta,int nind[2],vector<vecto
     }
     string line;
     int nc=0;
+    if(s>0){
+      if(nind[0]==0){
+        if(master) cout << "No. of ctrl = 0. Bye!\n";
+        end();
+      }
+      if(nind[1]==0){
+        if(master) cout << "No. of case = 0. Bye!\n";
+        end();
+      }
+    }
+
     nptr[s].push_back(nind[0]);
     nptr[s].push_back(nind[1]);
     while(getline(file,line)){
@@ -401,6 +412,16 @@ void il_tped(string &tped,string &tfam,string &meta_file,string &out_file,bool q
      }
      string line;
      int nc=0;
+     if(s>0){
+       if(nind[0]==0){
+         if(master) cout << "No. of ctrl = 0. Bye!\n";
+         end();
+       }
+       if(nind[1]==0){
+         if(master) cout << "No. of case = 0. Bye!\n";
+         end();
+       }
+     }
      nptr[s].push_back(nind[0]);
      nptr[s].push_back(nind[1]);
      while(getline(tf,line)){
