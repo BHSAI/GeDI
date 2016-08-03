@@ -1,15 +1,15 @@
 #
 CC=g++
-#GSLDIR=/home/hwoo/local
-#CFLAGS=-I$(GSLDIR)/include -c -Wall -O2
-#LDFLAGS=-L$(GSLDIR)/lib -lgsl -lgslcblas -O2
-CFLAGS=-c -Wall -g
-LDFLAGS=-lgsl -lgslcblas -g
+GSLDIR=/home/hwoo/local
+CFLAGS=-I$(GSLDIR)/include -c -Wall -g
+LDFLAGS=-L$(GSLDIR)/lib -lgsl -lgslcblas -g
+#CFLAGS=-c -Wall -g
+#LDFLAGS=-lgsl -lgslcblas -g
 
 all: gedi
 
-gedi: main.o il.o il_lr.o cl.o cl_lr.o
-	$(CC) main.o il.o il_lr.o cl.o cl_lr.o $(LDFLAGS) -o gedi
+gedi: main.o il.o il_lr.o cl.o cl_lr.o qt.o
+	$(CC) main.o il.o il_lr.o cl.o cl_lr.o qt.o $(LDFLAGS) -o gedi
 
 main.o: main.cpp
 	$(CC) $(CFLAGS) main.cpp
@@ -25,6 +25,9 @@ cl.o: cl.cpp
 
 cl_lr.o: cl_lr.cpp
 	$(CC) $(CFLAGS) cl_lr.cpp
+
+qt.o: qt.cpp
+	$(CC) $(CFLAGS) qt.cpp
 
 clean: 
 	rm -rf *.o gedi

@@ -31,6 +31,7 @@ bool q_pi=true;            // flag for single-locus p-value
 bool q_pij=false;          // flag for interaction p-values
 bool q_dump=false;         // flag for writing SNP selection lists during IL-cv
 bool q_pout=false;         // flag for asymptotic p-value output
+bool q_qt=false;           // flag for quantitative trait
 string excl_file="";       // snp exclusion list file 
 double pcut=-1;            // p-value cutoff for cross-validation
 double tol=1.0e-5;         // iteration tolerance
@@ -53,7 +54,7 @@ long End=-1;               // end position (1-based)
 bool q_boot=false;         // flag for boostrapping
 bool q_strict=false;       // flag for being strict
 int Seed=1;                // random no. seed
-float Max_mem=1.0e6;       // maximum memory
+float Max_mem=3.0e9;       // maximum memory
 
 void estop(int ecode){
    
@@ -175,6 +176,8 @@ int main(int argc,char* argv[]){
          q_mf=true;
        else if(flag=="pvout")
          q_pout=true;
+       else if(flag=="qt")
+         q_qt=true;
 #ifdef MPIP
        else if(flag=="mfp"){
          q_mfp=true;
@@ -336,7 +339,10 @@ int main(int argc,char* argv[]){
 // analysis section
 
    if(q_il){
-     if(master) cout << "Independent loci analysis\n\n";
+     if(master){
+       cout << "Independent loci analysis\n\n";
+       if(q_qt) cout << "Quantitative trait\n\n";
+     }
      if(q_pr){
        if(master) cout << "Prediction mode\n\n";
        if(q_par){
@@ -385,6 +391,7 @@ int main(int argc,char* argv[]){
    }
    else if(q_cl){
      if(master) cout << "Collective loci analysis\n\n";
+     if(q_qt) cout << "Quantitative trait\n\n";
      if(!q_ee && !q_mf && !q_lr) q_pl=true;   // default
      if(q_ee+q_mf+q_lr+q_pl!=1){
        if(master) cerr << "Please specify only one among -pseudo, -ee, -mf, -lr. Bye!\n";
@@ -466,6 +473,10 @@ int main(int argc,char* argv[]){
        end();
      }
    }
+// else if(q_qt){    //     quantitative trait
+//   if(master) cout << "Quantitative trait\n\n";
+//   cl_qt(meta_file);
+// }
    else{
      if(master)
        cerr << "Please specify the analysis to be performed: -il, -cl. Bye!\n";
