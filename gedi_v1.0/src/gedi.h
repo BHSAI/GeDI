@@ -81,6 +81,9 @@ double lpr(int cc,const std::vector<std::vector<std::vector<bool> > > &ai,
 double lpr_psl(int i0,int cc,const std::vector<std::vector<std::vector<bool> > > &ai,
     const std::vector<std::vector<double> > &f1,const std::vector<std::vector<std::vector<float> > > &f2,double lambda,std::vector<double> &h,std::vector<std::vector<float> > &J,int ifx,int jfx,int s);
 
+int myrandom(int i);
+void myshuffle(std::vector<double> &yk);
+
 double invC(int nind,const std::vector<std::vector<double> > &f1,
     const std::vector<std::vector<std::vector<float> > > &f2,double &lnz,
     std::vector<std::vector<double> > &h,std::vector<std::vector<std::vector<float> > > &J,

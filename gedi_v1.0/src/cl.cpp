@@ -20,7 +20,6 @@
 #include <gsl/gsl_sf_erf.h>
 #include <gsl/gsl_eigen.h>
 #include <gsl/gsl_min.h>
-#include <gsl/gsl_rng.h>
 #include <gsl/gsl_integration.h>
 #include "gedi.h"
 
@@ -389,6 +388,20 @@ void cl_tped(string &tped,string &tfam,string &meta,string &par,string &out_file
   cl_inf(ai,nptr,yk,out_file,par,q_lr,q_pr,q_qi,nsample,rs);     // CL inference
 }
 
+int myrandom(int i){
+
+  const gsl_rng_type *T;
+  gsl_rng *r;
+  gsl_rng_env_setup();
+  T=gsl_rng_default;
+  r=gsl_rng_alloc(T);
+  gsl_rng_set(r,Seed);
+
+  double u=gsl_rng_uniform(r);
+  return int(u*i);
+}
+
+
 // reads data from binary files
 void bin_read(string &meta,int &nsample,vector<vector<int> > &nptr,
     vector<vector<vector<bool> > > &ai,vector<string> &rs,const vector<string> &exc_list,
@@ -513,7 +526,8 @@ void bin_read(string &meta,int &nsample,vector<vector<int> > &nptr,
         }
       }
       else      // quantitative trait (all shuffled)
-        random_shuffle(yk[s].begin(),yk[s].end());
+//      random_shuffle(yk[s].begin(),yk[s].end(),myrandom);
+        myshuffle(yk[s]);
     }
   }
 
@@ -845,7 +859,8 @@ void tped_read(string &tped,string &tfam,string &meta,string &par,int &nsample,
           phe[s][n1[k]]=1;
       }
       else
-        random_shuffle(yk[s].begin(),yk[s].end());
+//      random_shuffle(yk[s].begin(),yk[s].end(),myrandom);
+        myshuffle(yk[s]);
     }
   }
 
@@ -2701,4 +2716,22 @@ double invC(int nind,const vector<vector<double> > &f1,const vector<vector<vecto
   Lk=nind*(Lk-lnz);
 
   return Lk;
+}
+
+void myshuffle(vector<double> &yk){
+
+  const gsl_rng_type *T;
+  gsl_rng *r;
+  gsl_rng_env_setup();
+  T=gsl_rng_default;
+  r=gsl_rng_alloc(T);
+  gsl_rng_set(r,Seed);
+
+  int n=yk.size();
+  for(int i=n-1;i>0;i--){
+    int j=int(gsl_rng_uniform(r)*(i+1));
+    double tmp=yk[i];
+    yk[i]=yk[j];
+    yk[j]=tmp;
+  }
 }

@@ -20,7 +20,6 @@
 #include <gsl/gsl_sf_erf.h>
 #include <gsl/gsl_eigen.h>
 #include <gsl/gsl_min.h>
-#include <gsl/gsl_rng.h>
 #include "gedi.h"
 
 using namespace std;
@@ -376,6 +375,10 @@ double qpl(const gsl_vector *v,void *params){ // log likelihood to be maximized
   }
   ln/=nind;
 
+  for(int l=0;l<L;l++){
+    ln+=Lh*h[0][l]*h[0][l]/2;
+    if(!q_null) ln+=Lh*h[1][l]*h[1][l]/2;
+  }
   for(int j=0;j<nsnp;j++){
     if(i0==j) continue;
     for(int l=0;l<L*L;l++){
@@ -422,8 +425,8 @@ void dqpl(const gsl_vector *v,void *params,gsl_vector *df){  // 1st derivatives
   vector<vector<double> > w2(nsnp);
 
   for(int l=0;l<L;l++){
-    s1[l]=-(par->f1)[0][i0][l];        // conjugate to h[0]
-    if(!q_null) w1[l]=-(par->f1)[1][i0][l];        // conjugate to h[1]
+    s1[l]=-(par->f1)[0][i0][l]+Lh*h[0][l];      
+    if(!q_null) w1[l]=-(par->f1)[1][i0][l]+Lh*h[1][l];
   }
   for(int j=0;j<nsnp;j++){
     if(i0==j) continue;

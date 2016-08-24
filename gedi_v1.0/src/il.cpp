@@ -10,6 +10,7 @@
 #include <gsl/gsl_sf_pow_int.h>
 #include <gsl/gsl_sf_gamma.h>
 #include <gsl/gsl_linalg.h>
+#include <gsl/gsl_rng.h>
 #include <gsl/gsl_multimin.h>
 #include "gedi.h"
 
@@ -25,9 +26,14 @@ extern bool q_cv;                 // true if cross-validation
 extern bool q_meta;               // true if meta-analysis
 extern bool q_metab;              // true if meta-analysis (binary)
 extern bool q_dump;               // true for writing SNP list during CV
+extern bool q_qt;                 // true if quantitative trait
+extern bool q_boot;               // true if permuting for null
 extern double pcut;               // p-value cutoff for cross-validation
 extern double hwe;
 extern double maf;
+extern bool q_covar;              // covariates
+extern string cvar_file;          // covariate file
+extern int Seed;
 extern string qc_outf;            // output tped file for quality control mode
 extern string bfile;              // binary file prefix
 const double Tolq=1.0e-7;
@@ -40,7 +46,7 @@ void infer_par(int nv,const vector<vector<vector<bool> > > &ai,double &alpha,
 // read binary bim/fam files
 void read_bfm(vector<string> &mbfile,const string& meta,int nind[2],vector<vector<int> > &nptr,
     vector<vector<short> > &phe,vector<char> &a0,vector<char> &a1,vector<int> &nchr,
-    vector<long> &pos,vector<string> &rs){   
+    vector<long> &pos,vector<string> &rs,vector<vector<double> > &yk){   
 
   int nsample=0;  // number of samples;
   if(!q_metab){
@@ -68,7 +74,10 @@ void read_bfm(vector<string> &mbfile,const string& meta,int nind[2],vector<vecto
   }
 
   nptr.resize(nsample+1);          // 1st indices for each sample; nptr[s][y]
-  phe.resize(nsample);
+  if(!q_qt)
+    phe.resize(nsample);
+  else
+    yk.resize(nsample);
 
   // read fam files
   for(int s=0;s<nsample;s++){
@@ -80,7 +89,7 @@ void read_bfm(vector<string> &mbfile,const string& meta,int nind[2],vector<vecto
     }
     string line;
     int nc=0;
-    if(s>0){
+    if(s>0 && !q_qt){
       if(nind[0]==0){
         if(master) cout << "No. of ctrl = 0. Bye!\n";
         end();
@@ -92,26 +101,44 @@ void read_bfm(vector<string> &mbfile,const string& meta,int nind[2],vector<vecto
     }
 
     nptr[s].push_back(nind[0]);
-    nptr[s].push_back(nind[1]);
+    if(!q_qt) nptr[s].push_back(nind[1]);
+    double yav=0;
+    double var=0;
     while(getline(file,line)){
       istringstream iss(line);
       string iid;
       int fid,y;
       iss >> iid; iss >> iid;
       for(int i=0;i<3;i++) iss >> fid;
-      iss >> y; y--;
-      if(y<0 || y>1){
-        if(master) cerr << "Unknown phenotype code in tfam file\n";
-        end();
+      if(!q_qt){
+        iss >> y; y--;
+        if(y<0 || y>1){
+          if(master) cerr << "Unknown phenotype code in tfam file\n";
+          end();
+        }
+        phe[s].push_back(y);
+        nind[y]++;
       }
-      phe[s].push_back(y);
-      nind[y]++;
+      else{
+        double y;
+        iss >> y;
+        yk[s].push_back(y);
+        nind[0]++;
+        yav+=y;
+        var+=y*y;
+      }
       nc++;
     }
     file.close();
+    if(q_qt){
+      yav/=nind[0];
+      var=sqrt(var/(nind[0]-1));
+      for(int k=0;k<nind[0];k++)
+        yk[s][k]=(yk[s][k]-yav)/var;
+    }
   }
   nptr[nsample].push_back(nind[0]);
-  nptr[nsample].push_back(nind[1]);
+  if(!q_qt) nptr[nsample].push_back(nind[1]);
 
   int nsnp=0;
   // read bim files
@@ -185,7 +212,7 @@ void read_bfm(vector<string> &mbfile,const string& meta,int nind[2],vector<vecto
 // Perform IL analysis using bed file
 void il_bed(string &meta,string &out_file,bool q_lr){
 
-  if(master){
+  if(master && !q_qt){
     if(q_minor_ctl) cout << "Minor alleles defined with respect to control group\n\n";
     else cout << "Minor alleles defined with respect to case + control groups\n\n";
   }
@@ -199,10 +226,17 @@ void il_bed(string &meta,string &out_file,bool q_lr){
   vector<int> nchr; // chr.no.
   vector<long> pos; // position
   vector<string> rs; // snps
+  vector<vector<double> > yk; // quantitative phenotypes
 
-  read_bfm(mbfile,meta,nind,nptr,phe,a0,a1,nchr,pos,rs);  // read bim fam files
+  read_bfm(mbfile,meta,nind,nptr,phe,a0,a1,nchr,pos,rs,yk);  // read bim fam files
   int nsample=mbfile.size();   // no. of samples
   int ntot=nind[0]+nind[1];
+  if(master) cout << "No. of individuals = " << ntot << endl << endl;
+  if(q_qt && q_boot)    // bootstrap
+    for(int s=0;s<nsample;s++)
+//    random_shuffle(yk[s].begin(),yk[s].end(),myrandom);
+      myshuffle(yk[s]);
+
   int nsnp=a0.size();
 
   ofstream of;
@@ -249,6 +283,7 @@ void il_bed(string &meta,string &out_file,bool q_lr){
   for(int i=0;i<nsnp;i++){  // loop over snps
     double alpha=0;
     double beta[2]={0,};
+    vector<double> hs(2*L);
     if(i>=Npr && i%Npr==0 && master) cout << "reading " << i << "'th SNP..." << endl;
 
     double qtot=0;
@@ -257,12 +292,18 @@ void il_bed(string &meta,string &out_file,bool q_lr){
     double teff=0;
     int nscount=0;
     for(int s=0;s<nsample;s++){
-      int ncase=nptr[s+1][1]-nptr[s][1];
+      int ncase=0;
+      if(!q_qt)
+        ncase=nptr[s+1][1]-nptr[s][1];
       int nctrl=nptr[s+1][0]-nptr[s][0];
 //    int nsize=nptr[s+1][0]+nptr[s+1][1]-nptr[s][0]-nptr[s][1];
       int nsize=ncase+nctrl;
       int nbyte=int(ceil(nsize/4.));              // no. of bytes for each snp
-      double neff=2.0/sqrt(1.0/ncase+1.0/nctrl);  // effective sample size weight
+      double neff=0;
+      if(!q_qt) 
+        neff=2.0/sqrt(1.0/ncase+1.0/nctrl);  // effective sample size weight
+      else
+        neff=sqrt(nsize);
       char *data=new char[nbyte];
       string gi0="";
       string gi1="";
@@ -293,14 +334,32 @@ void il_bed(string &meta,string &out_file,bool q_lr){
       }
       int nmiss[2]={0,};
       double fr1[2][2]={{0,}};
+      double fry[2]={0,};    // y-weighted freq. for qt
       freq(nmiss,gi0,gi1,phe[s],minor,major,rsk,fr1,s);  // if s==0, minor/major are set; otherwise 
                                                          // they are used and not changed
+      vector<short> ak;
+      if(q_qt){
+        ak.resize(nsize);
+        for(int n=0;n<nsize;n++){
+          int a=(gi0.at(n)==minor)+(gi1.at(n)==minor);
+          if(a>0)
+            fry[a-1]+=yk[s][n];
+          ak[n]=a;
+        }
+        fry[0]/=nmiss[0];
+        fry[1]/=nmiss[0];
+      }
       double alp=0;
       double bet[2]={0,};
       double q=0;
       bool nna=true;
-      if(!q_lr)
-        nna=assoc(fr1,nmiss,q,alp,bet);      // GeDI inference 
+      vector<double> h(2*L);
+      if(!q_lr){
+        if(!q_qt)
+          nna=assoc(fr1,nmiss,q,alp,bet);      // GeDI inference 
+        else
+          nna=qt_assoc(ak,yk[s],fr1[0],fry,nmiss[0],q,h);
+      }
       else{                                  // LR inference
         switch(model){
            case(GEN):
@@ -336,22 +395,30 @@ void il_bed(string &meta,string &out_file,bool q_lr){
       }
       if(nna){
         qtot+=q;
-        alpha+=alp*neff;
-        beta[0]+=bet[0]*neff;
-        beta[1]+=bet[1]*neff;
         nmist[0]+=nmiss[0];
-        nmist[1]+=nmiss[1];
+        if(!q_qt){
+          alpha+=alp*neff;
+          beta[0]+=bet[0]*neff;
+          beta[1]+=bet[1]*neff;
+          nmist[1]+=nmiss[1];
+        }
+        else
+          for(int l=0;l<2*L;l++) hs[l]+=h[l]*neff;
         teff+=neff;
         nscount++;
       }
     } // end of sample loop
     bool nnat=nscount>0;
     if(nnat){
-      alpha/=teff;
-      beta[0]/=teff;
-      beta[1]/=teff;
+      if(!q_qt){
+        alpha/=teff;
+        beta[0]/=teff;
+        beta[1]/=teff;
+      }
+      else
+        for(int l=0;l<2*L;l++) hs[l]/=teff;
     }
-    il_stat(of,nchr[i],rs[i],pos[i],minor,nmist,nnat,qtot,nscount,alpha,beta);
+    il_stat(of,nchr[i],rs[i],pos[i],minor,nmist,nnat,qtot,nscount,alpha,beta,hs);
   }  // end of snp loop
 
   if(master) cout << nsnp << " snps analyzed\n\n";
@@ -402,6 +469,7 @@ void il_tped(string &tped,string &tfam,string &meta_file,string &out_file,bool q
    int nind[2]={0,};
    vector<vector<int> > nptr(nsample+1);   // index of 1st person in each sample
    vector<vector<short> > phe(nsample);    // phenotype
+   vector<vector<double> > yk(nsample);
 
    for(int s=0;s<nsample;s++){
      ifstream tf;
@@ -423,26 +491,44 @@ void il_tped(string &tped,string &tfam,string &meta_file,string &out_file,bool q
        }
      }
      nptr[s].push_back(nind[0]);
-     nptr[s].push_back(nind[1]);
+     if(!q_qt) nptr[s].push_back(nind[1]);
+     double yav=0;
+     double var=0;
      while(getline(tf,line)){
        istringstream iss(line);
        string iid;
        int fid,y;
+       double yki;
        iss >> iid; iss >> iid;
        for(int i=0;i<3;i++) iss >> fid;
-       iss >> y; y--;
-       if(y<0 || y>1){
-         cerr << "Unknown phenotype code in tfam file " << mtfam[s] << endl;
-         exit(1);
+       if(!q_qt){
+         iss >> y; y--;
+         if(y<0 || y>1){
+           cerr << "Unknown phenotype code in tfam file " << mtfam[s] << endl;
+           exit(1);
+         }
+         phe[s].push_back(y);
+         nind[y]++;
        }
-       phe[s].push_back(y);
-       nind[y]++;
+       else{
+         iss >> yki;
+         yk[s].push_back(yki);
+         nind[0]++;
+         yav+=yki;
+         var+=yki*yki;
+       }
        nc++;
      } 
      tf.close(); 
+     if(q_qt){
+       yav/=nind[0];
+       var=sqrt(var/(nind[0]-1));
+       for(int k=0;k<nind[0];k++)
+         yk[s][k]=(yk[s][k]-yav)/var;
+     }
    }
    nptr[nsample].push_back(nind[0]);
-   nptr[nsample].push_back(nind[1]);
+   if(!q_qt) nptr[nsample].push_back(nind[1]);
 // int ntot=nind[0]+nind[1];
 
    string gi0,gi1;
@@ -456,7 +542,7 @@ void il_tped(string &tped,string &tfam,string &meta_file,string &out_file,bool q
    int posm;
    vector<vector<short> > ani(2);   // single snp genotype array
 
-   if(master){
+   if(master && !q_qt){
      if(q_minor_ctl) cout << "Minor alleles defined with respect to control group\n\n";
      else cout << "Minor alleles defined with respect to case + control groups\n\n";
    }
@@ -493,6 +579,7 @@ void il_tped(string &tped,string &tfam,string &meta_file,string &out_file,bool q
    while(getline(f0[0],line)){  // loop over snps (rows)
      double alpha=0;
      double beta[2]={0,};
+     vector<double> hs(2*L);
      int s=0;
      int nchr;
      double qtot=0;
@@ -521,10 +608,15 @@ void il_tped(string &tped,string &tfam,string &meta_file,string &out_file,bool q
          gi1+=c;             // 2nd allele
        }
 //     unsigned int nsize=nptr[s+1][0]-nptr[s][0]+nptr[s+1][1]-nptr[s][1];
-       unsigned int ncase=nptr[s+1][1]-nptr[s][1];
+       unsigned int ncase=0;
+       if(!q_qt) ncase=nptr[s+1][1]-nptr[s][1];
        unsigned int nctrl=nptr[s+1][0]-nptr[s][0];
        unsigned int nsize=ncase+nctrl;
-       double neff=2.0/sqrt(1.0/ncase+1.0/nctrl);
+       double neff=0;
+       if(!q_qt)
+         neff=2.0/sqrt(1.0/ncase+1.0/nctrl);
+       else
+         neff=sqrt(nsize);
        if(gi0.size()!=nsize){
          if(master)
            cerr << " Genotype data in " << mtped[s] << " do not match " << mtfam[s] << endl;
@@ -532,12 +624,30 @@ void il_tped(string &tped,string &tfam,string &meta_file,string &out_file,bool q
        }
        int nmiss[2]={0,};
        freq(nmiss,gi0,gi1,phe[s],minor,major,rsk,f1,s);
+       vector<short> ak;
+       double fry[2]={0,};
+       if(q_qt){
+         ak.resize(nsize);
+         for(int n=0;n<int(nsize);n++){
+           int a=(gi0.at(n)==minor)+(gi1.at(n)==minor);
+           if(a>0)
+             fry[a-1]+=yk[s][n];
+           ak[n]=a;
+         }
+         fry[0]/=nmiss[0];
+         fry[1]/=nmiss[1];
+       }
        double alp=0;
        double bet[2]={0,};
        double q=0;
        bool nna=true;
-       if(!q_lr)
-         nna=assoc(f1,nmiss,q,alp,bet);      // GeDI inference 
+       vector<double> h(2*L);
+       if(!q_lr){
+         if(!q_qt)
+           nna=assoc(f1,nmiss,q,alp,bet);      // GeDI inference 
+         else
+           nna=qt_assoc(ak,yk[s],f1[0],fry,nmiss[0],q,h);
+       }
        else{
          switch(model){                   // LR inference
            case(GEN):
@@ -573,11 +683,15 @@ void il_tped(string &tped,string &tfam,string &meta_file,string &out_file,bool q
        if(nna){
          qtot+=q;
          teff+=neff;
-         alpha+=alp*neff;
-         beta[0]+=bet[0]*neff;
-         beta[1]+=bet[1]*neff;
          nmist[0]+=nmiss[0];
-         nmist[1]+=nmiss[1];
+         if(!q_qt){
+           alpha+=alp*neff;
+           beta[0]+=bet[0]*neff;
+           beta[1]+=bet[1]*neff;
+           nmist[1]+=nmiss[1];
+         }
+         else
+           for(int l=0;l<2*L;l++) hs[l]+=h[l]*neff;
          nscount++;
        }
        if(++s==nsample) break;
@@ -585,16 +699,20 @@ void il_tped(string &tped,string &tfam,string &meta_file,string &out_file,bool q
      }
      bool nnat=nscount>0;
      if(nnat){
-       alpha/=teff;
-       beta[0]/=teff;
-       beta[1]/=teff;
+       if(!q_qt){
+         alpha/=teff;
+         beta[0]/=teff;
+         beta[1]/=teff;
+       }
+       else
+         for(int l=0;l<2*L;l++) hs[l]/=teff;
      }
      if(master){
        if(nsnp>Npr && nsnp%Npr==0) 
          cout << "inferring parameters for " << nsnp << "'th SNP:\n";
      }
      nsnp++;
-     il_stat(of,nchr,rsn[0],pos,minor,nmist,nnat,qtot,nscount,alpha,beta);
+     il_stat(of,nchr,rsn[0],pos,minor,nmist,nnat,qtot,nscount,alpha,beta,hs);
    }
    if(master) cout << nsnp << " snps analyzed\n\n";
 
@@ -605,57 +723,74 @@ void il_tped(string &tped,string &tfam,string &meta_file,string &out_file,bool q
 
 void header(ofstream& of,int nind[2]){
 
-   of << setw(4) << right << "Chr" << "  "
-      << setw(12) << left << "SNP" << "  "
-      << setw(12) << right <<"Position" << "  "
-      << setw(3) << "MA"  << "  " 
-      << setw(5) << "Model" << "  " 
-      << setw(6) << "n" << "  "
-      << setw(11) << left << "alpha" << "  ";
-   if(model==GEN)
-      of << setw(11) << "OR1" << "  "  << setw(11) << "OR2" << "  ";
-   else
-      of << setw(11) << "OR" << "  ";
-   of << setw(11) << "q" << "  ";
-   of << setw(4) << "df" << "  ";
+   of << setw(4) << right << "Chr" << " "
+      << setw(10) << left << "SNP" << " "
+      << setw(10) << right <<"Position" << " "
+      << setw(3) << "MA"  << " " 
+      << setw(5) << "Model" << " " 
+      << setw(6) << "n" << " ";
+   if(!q_qt){
+     of << setw(11) << left << "alpha" << " ";
+     if(model==GEN) of << setw(11) << "OR1" << " "  << setw(11) << "OR2" << " ";
+     else of << setw(11) << "OR" << " ";
+   }
+   else{
+     of << setw(11) << left << "h00" << " ";
+     if(model==GEN) of << setw(11) << "h01" << " ";
+     of << setw(11) << "h10" << " ";
+     if(model==GEN) of << setw(11) << "h11" << " ";
+   }
+   of << setw(11) << "q" << " ";
+   of << setw(4) << "df" << " ";
    of << setw(11) << "P" << " ";
-   double pd=double(nind[1])/(nind[0]+nind[1]);
-   of << "Pd: " <<  pd << endl;
+   if(!q_qt){
+     double pd=double(nind[1])/(nind[0]+nind[1]);
+     of << "Pd: " <<  pd << endl;
+   }
+   else
+     of << endl;
 }
 
 void il_stat(ofstream& of,int nchr,string &rsn,int pos,char minor,int nmiss[],bool nna,
-             double q,int nsample,double &alpha,double beta[]){
+     double q,int nsample,double &alpha,double beta[],const vector<double> &hs){
 
      of << setprecision(5);
-     of << setw(4) << right << nchr << "  ";
-     of << setw(12) << left << rsn << "  ";
-     of << setw(12) << right << pos << "  ";
-     of << setw(3)  << minor << "  ";
-     of << setw(5)  << Mname[model] << "  ";
-     of << setw(6) << nmiss[0]+nmiss[1] << "  ";
-     if(nna){              
-       of << setw(11) << left << alpha << "  ";
-       double eb=exp(beta[0]);
-       of << setw(11) << left << eb << "  ";          // odds ratio
-       if(model==GEN){
-         eb=exp(beta[1]);
-         of << setw(11) << eb << "  ";
+     of << setw(4) << right << nchr << " ";
+     of << setw(10) << left << rsn << " ";
+     of << setw(10) << right << pos << " ";
+     of << setw(3)  << minor << " ";
+     of << setw(5)  << Mname[model] << " ";
+     of << setw(6) << nmiss[0]+nmiss[1] << " ";
+     if(nna){
+       if(!q_qt){
+         of << setw(11) << left << alpha << " ";
+         double eb=exp(beta[0]);
+         of << setw(11) << left << eb << " ";          // odds ratio
+         if(model==GEN){
+           eb=exp(beta[1]);
+           of << setw(11) << eb << " ";
+         }
        }
-       of << setw(11) << q << "  ";
+       else{  // qt
+         for(int l=0;l<L;l++)
+           of << setw(11) << left << hs[2*l] << " ";
+         for(int l=0;l<L;l++)
+           of << setw(11) << left << hs[2*l+1] << " ";
+       }
+       of << setw(11) << q << " ";
        int df=L*nsample;
-       of << setw(4) << df << "  ";
+       of << setw(4) << df << " ";
        double p=1.0;
        if(q>0)
-//       p=gsl_sf_gamma_inc_Q(0.5*L*nsample,q/2);
          p=gsl_sf_gamma_inc_Q(0.5*df,q/2);
        of << setw(11) << left << p << endl;
      }
      else{                           // bad statistics
-       of << setw(11) << left << "NA" << "  ";  
-       if(model==GEN) of << setw(11) << left << "NA" << "  ";
-       of << setw(11) << left << "NA" << "  ";
-       of << setw(11) << left << "NA" << "  ";
-       of << setw(4) << left << "NA" << "  ";
+       of << setw(11) << left << "NA" << " ";  
+       if(model==GEN) of << setw(11) << left << "NA" << " ";
+       of << setw(11) << left << "NA" << " ";
+       of << setw(11) << left << "NA" << " ";
+       of << setw(4) << left << "NA" << " ";
        of << setw(11) << left << "NA" << endl;
      }
 }
@@ -784,9 +919,10 @@ void freq(int nmiss[],const string &gi0,const string &gi1,const vector<short> &p
   double af[2][4]={{0,}};   // allele freq
 
   nmiss[0]=nmiss[1]=0;
-  int ntot=phe.size();
+//int ntot=phe.size();
+  int ntot=gi0.size();
   for(int n=0;n<ntot;n++){
-    int y=phe[n];
+    int y=(q_qt ? 0 : phe[n]);
     int k;
     for(k=0;k<4;k++)
       if(code[k]==gi0.c_str()[n]) break;  // 1st allele
@@ -799,7 +935,8 @@ void freq(int nmiss[],const string &gi0,const string &gi1,const vector<short> &p
     nmiss[y]++;
   }
 
-  for(int y=0;y<2;y++) for(int k=0;k<4;k++)
+  int ymax=(q_qt ? 1 : 2);
+  for(int y=0;y<ymax;y++) for(int k=0;k<4;k++)
     af[y][k]=count[y][k]/double(2*nmiss[y]);
 
   int g0=-1;   // major allele
@@ -828,7 +965,7 @@ void freq(int nmiss[],const string &gi0,const string &gi1,const vector<short> &p
 
   double f[2][2]={{0,}};
   double f0[2]={0,};
-  for(int y=0;y<2;y++){
+  for(int y=0;y<ymax;y++){
     f[y][0]=af[y][g0];
     f[y][1]=af[y][g1];
     f0[0]+=f[y][0]*nmiss[y];
@@ -874,7 +1011,7 @@ void freq(int nmiss[],const string &gi0,const string &gi1,const vector<short> &p
 
   f1[0][0]=f1[0][1]=f1[1][0]=f1[1][1]=0;
   for(int n=0;n<ntot;n++){
-    int y=phe[n];
+    int y=(q_qt ? 0 : phe[n]);
     int k;
     for(k=0;k<4;k++)
       if(code[k]==gi0.at(n)) break;
@@ -891,7 +1028,7 @@ void freq(int nmiss[],const string &gi0,const string &gi1,const vector<short> &p
     else if(code[a0]==minor && code[a1]==minor)
       f1[y][1]++;                        // ai=2  (AA)
   }
-  for(int y=0;y<2;y++) for(int a=0;a<2;a++)
+  for(int y=0;y<ymax;y++) for(int a=0;a<2;a++)
     f1[y][a]/=nmiss[y];
 
 }
@@ -1080,6 +1217,7 @@ void pr_tped(string &tped,string &tfam,string &meta_file,string &par_file,string
    int nsample=0;   // no. of samples
    vector<string> mtped; 
    vector<string> mtfam;
+   vector<string> mtcov;
    ofstream ocv;
    if(master) ocv.open("gedi.auc",ios::out);
 
@@ -1101,6 +1239,11 @@ void pr_tped(string &tped,string &tfam,string &meta_file,string &par_file,string
        iss >> name;
        if(master) cout << setw(15) << name << endl;
        mtfam.push_back(name);
+       if(q_covar){
+         iss >> name;
+         if(master) cout << setw(15) << name << " ";
+         mtcov.push_back(name);
+       }
        nsample++;
      }
      if(master) cout << endl;
@@ -1108,6 +1251,7 @@ void pr_tped(string &tped,string &tfam,string &meta_file,string &par_file,string
    else{
      mtped.push_back(tped);
      mtfam.push_back(tfam);
+     if(q_covar) mtcov.push_back(cvar_file);
      nsample=1;
    }
 
@@ -1116,6 +1260,8 @@ void pr_tped(string &tped,string &tfam,string &meta_file,string &par_file,string
    int nind[2]={0,};
    vector<vector<int> > nptr(nsample+1);   // index of 1st person in each sample
    vector<vector<short> > phe(nsample);    // phenotype
+   vector<vector<string> > fid(nsample);
+   vector<vector<string> > iid(nsample);
 
    for(int s=0;s<nsample;s++){
      ifstream tf;
@@ -1130,10 +1276,13 @@ void pr_tped(string &tped,string &tfam,string &meta_file,string &par_file,string
      nptr[s].push_back(nind[1]);
      while(getline(tf,line)){
        istringstream iss(line);
-       string iid;
-       int fid,y;
-       iss >> iid; iss >> iid;
-       for(int i=0;i<3;i++) iss >> fid;
+       string tmp;
+       int y;
+       iss >> tmp; 
+       fid[s].push_back(tmp);
+       iss >> tmp;
+       iid[s].push_back(tmp);
+       for(int i=0;i<3;i++) iss >> tmp;
        iss >> y; y--;
        if(y<0 || y>1){
          cerr << "Unknown phenotype code in tfam file " << mtfam[s] << endl;
@@ -1147,6 +1296,85 @@ void pr_tped(string &tped,string &tfam,string &meta_file,string &par_file,string
    }
    nptr[nsample].push_back(nind[0]);
    nptr[nsample].push_back(nind[1]);
+
+   vector<vector<double> > xcvr;   // covariate coefficients
+   vector<vector<double> > vr;     // variances
+   vector<vector<double> > xi(nsample);
+   int ncovar=0;
+   if(q_covar){
+     xcvr.resize(3);
+     vr.resize(3);
+     for(int s=0;s<nsample;s++){
+       ifstream cvf;
+       cvf.open(mtcov[s].c_str(),ios::in);
+       if(!cvf.is_open()){
+         if(master) cerr << "File " << cvar_file << " cannot be opened.\n";
+         end();
+       }
+       string line;
+       getline(cvf,line);      // use header to count covariates
+       istringstream iss(line);
+       string st;
+       iss >> st; iss >> st;   // FID and IID
+       vector<string> header;
+       ncovar=0;
+       while(iss >> st){
+         ncovar++;
+         header.push_back(st);
+       }
+       vector<vector<double> > s1(2);
+       vector<vector<double> > s2(2);
+       for(int y=0;y<2;y++){
+         s1[y].resize(ncovar);
+         s2[y].resize(ncovar);
+       }
+       xi[s].resize(ncovar);
+
+       int n=0;
+       while(getline(cvf,line)){
+         istringstream iss(line);
+         string id,id2;
+         iss >> id;
+         iss >> id2;
+         if(id!=fid[s][n] || id2!=iid[s][n]){
+           if(master){
+             if(nsample>0) cerr << "In sample #" << s << " ";
+             cerr << "FID " << id << " or IID " << id2 << " does not match tfam file.\n";
+           }
+           end();
+         }
+         int y=phe[s][n];
+         int m=0;
+         double var;
+         while(iss >> var){
+           s1[y][m]+=var;
+           s2[y][m]+=var*var;
+         }
+         n++;
+       }
+       if(master){
+         if(nsample>0) cerr << "For sample #" << s << " ";
+         cout << ncovar << " covariates for " << n << " individuals read from " << mtcov[s]
+               << endl << endl;
+       }
+       for(int y=0;y<3;y++){
+         xcvr[y].resize(ncovar);
+         vr[y].resize(ncovar);
+       }
+       for(int m=0;m<ncovar;m++){
+         double v=0;
+         for(int y=0;y<2;y++){
+           double mean=s1[y][m]/nind[y];
+           v=(nind[y]*s2[y][m]-s1[y][m]*s1[y][m])/(nind[y]*(nind[y]-1));
+           xcvr[y][m]=mean/v;
+           vr[y][m]=v;
+         }
+         vr[2][m]=(n*(s2[0][m]+s2[1][m])-(s1[0][m]+s1[1][m])*(s1[0][m]+s1[1][m]))/(n*(n-1));
+         xi[s][m]=xcvr[1][m]-xcvr[0][m];
+       }
+     }
+   }  // end of covar 
+
 
    string gi0,gi1;
    double f1[2][2]={{0,}};   // frequency f1[y=0,1][Aa,AA]
@@ -1345,7 +1573,7 @@ void pr_tped(string &tped,string &tfam,string &meta_file,string &par_file,string
 }
 
 // Perform cross-validation using binary file
-void il_bpr(string &meta_file,string &out_file,string &par_file,bool q_lr){  
+void il_bpr(string &meta_file,string &out_file,string &par_file,bool q_lr){
 
   vector<string> mbfile;  // binary files
   int nind[2]={0,};
@@ -1356,8 +1584,9 @@ void il_bpr(string &meta_file,string &out_file,string &par_file,bool q_lr){
   vector<int> nchr; // chr.no.
   vector<long> pos; // position
   vector<string> rs; // snps
+  vector<vector<double> > yk; // qt
 
-  read_bfm(mbfile,meta_file,nind,nptr,phe,a0,a1,nchr,pos,rs);  // read bim fam files
+  read_bfm(mbfile,meta_file,nind,nptr,phe,a0,a1,nchr,pos,rs,yk);  // read bim fam files
   int nsample=mbfile.size();   // no. of samples
   int nsnp=a0.size();
 

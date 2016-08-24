@@ -32,6 +32,7 @@ bool q_pij=false;          // flag for interaction p-values
 bool q_dump=false;         // flag for writing SNP selection lists during IL-cv
 bool q_pout=false;         // flag for asymptotic p-value output
 bool q_qt=false;           // flag for quantitative trait
+bool q_covar=false;        // flag for covariates
 string excl_file="";       // snp exclusion list file 
 double pcut=-1;            // p-value cutoff for cross-validation
 double tol=1.0e-5;         // iteration tolerance
@@ -42,6 +43,7 @@ double Lh=0;               // penalizer for h
 unsigned int imax=10000;    // maximum no. of iteration
 string qc_outf="qc.tped";  // quality control mode output genotype file
 string bfile="";           // binary data file prefix
+string cvar_file="";       // covariate file
 int ncv=5;                 // order of cross-validation
 int meta=1;                // no. of samples in meta-analysis
 int Npr=10000;             // print freq. for tped SNP numbers
@@ -251,6 +253,10 @@ int main(int argc,char* argv[]){
            eps.push_back(atof(nu.c_str()));
            if(i==argc) break;
          }
+       }
+       else if(flag=="covar"){ // covariate file
+         cvar_file=argv[i++];
+         q_covar=true;
        }
        else if(flag=="lh")
          Lh=atof(argv[i++]);
