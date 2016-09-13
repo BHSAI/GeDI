@@ -76,7 +76,7 @@ One can use logistic regression for CL inference by specifying
 
     -lr
 
-This option behaves the same way as PL/EE (also using lambda). LR will in general be faster than DDA but less accurate.
+This option behaves the same way as PL/EE (also using lambda). LR is not very scalable and usable for ~10 SNPs or less.
 
 ***
 [Up](README.md)
