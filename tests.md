@@ -42,8 +42,8 @@ sets the random number seed (positive integer). This process needs to be repeate
      $!/bin/bash
      n=1
      while [ $n -le 100 ]; do
-       $ gedi -cl --bfile file --pcut 1 -boot --seed ${n} -qij
-       $ mv gedi.qij gedi_${n}.qij
+       gedi -cl --bfile file --pcut 1 -boot --seed ${n} -qij
+       mv gedi.qij gedi_${n}.qij
        let n=n+1
      done
 
