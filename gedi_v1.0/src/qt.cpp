@@ -48,6 +48,7 @@ extern bool q_marg;      // true if marginal calculation
 extern bool q_pi;        // true if single-locus p-value
 extern bool q_pij;       // true if interaction p-value
 extern bool q_qij;       // true if interaction LR statistic
+extern bool q_qtil;      // true if qt-IL
 extern bool q_pout;      // true if p-value output
 extern int ncv;
 extern string excl_file; // snp exclusion list
@@ -130,7 +131,7 @@ void cl_qt(string &meta){
 //  tped_read(tped,tfam,meta,par,nsample,nptr,ai,rs,exc_list);   // read genotypes
 //else
 
-  bin_read(meta,nsample,nptr,ai,rs,exc_list,yk);
+  bin_read(meta,nsample,nptr,ai,rs,exc_list,yk,false);
 
   vector<vector<vector<vector<bool> > > > av(nsample); // not used
   vector<vector<vector<vector<bool> > > > aw(nsample);
@@ -314,6 +315,48 @@ bool qt_assoc(const vector<short> &ak,const vector<double> &yk,double f1[2],doub
 
 }
 
+// linear regression QT
+bool qtlr_assoc(const vector<short> &ak,const vector<double> &yk,double f1[2],int &nind,double &q,vector<double> &h){
+
+  double xave=0;
+  double yave=0;
+  for(int k=0;k<nind;k++){
+    int a=ak[k];
+    a=code(a,model);
+    xave+=a;
+    double y=yk[k];
+    yave+=y;
+  }
+  xave/=nind;
+  yave/=nind;
+  double s0=0;
+  double s1=0;
+  for(int k=0;k<nind;k++){
+    int a=ak[k];
+    a=code(a,model);
+    double y=yk[k];
+    s0+=(y-yave)*(a-xave);
+    s1+=(a-xave)*(a-xave);
+  }
+  double beta1=s0/s1;
+  double beta0=yave-beta1*xave;
+
+  double s2=0;
+  for(int k=0;k<nind;k++){
+    int a=ak[k];
+    a=code(a,model);
+    double df=yk[k]-beta0-beta1*a;
+    s2+=df*df;
+  }
+//double se=sqrt(s2/(nind-2)/s1);
+  q=beta1*sqrt(s1*(nind-2)/s2);
+
+  h[0]=beta0;
+  h[1]=beta1;
+
+  return true;
+}
+
 double qpl(const gsl_vector *v,void *params){ // log likelihood to be maximized 
 
   vector<vector<double> > h(2);
@@ -326,12 +369,14 @@ double qpl(const gsl_vector *v,void *params){ // log likelihood to be maximized
   int ymax=(q_null ? 1 : 2);
   for(int y=0;y<ymax;y++){
     h[y].resize(L);
+    if(q_qtil) continue;
     J[y].resize(nsnp);
     for(int j=0;j<nsnp;j++) J[y][j].resize(L*L);
   }
   int m=0;
   for(int y=0;y<ymax;y++) for(int l0=0;l0<L;l0++){      // extract parameters
     h[y][l0]=gsl_vector_get(v,m++);
+    if(q_qtil) continue;
     for(int j=0;j<nsnp;j++){
       if(j==i0) continue;
       for(int l1=0;l1<L;l1++)
@@ -349,14 +394,17 @@ double qpl(const gsl_vector *v,void *params){ // log likelihood to be maximized
       double e=h[0][a];
       if(!q_null)
         e+=y*h[1][a];
-      for(int j=0;j<nsnp;j++){
-        if(i0==j) continue;
-        int b=2*(par->ai)[n][2*j]+(par->ai)[n][2*j+1];
-        int jb=code(b,model);
-        if(jb>0){
-          e+=J[0][j][2*a+jb-1];
-          if(!q_null)
-            e+=y*J[1][j][2*a+jb-1];
+      if(!q_qtil){
+        for(int j=0;j<nsnp;j++){
+          if(i0==j) continue;
+          int b=2*(par->ai)[n][2*j]+(par->ai)[n][2*j+1];
+          int jb=code(b,model);
+          if(jb>0){
+            e+=J[0][j][2*a+jb-1];
+            if(!q_null)
+              e+=y*J[1][j][2*a+jb-1];
+          }
+
         }
       }
       ha[a]=e;
@@ -381,6 +429,7 @@ double qpl(const gsl_vector *v,void *params){ // log likelihood to be maximized
   }
   for(int j=0;j<nsnp;j++){
     if(i0==j) continue;
+    if(q_qtil) continue;
     for(int l=0;l<L*L;l++){
       if(!q_null)
         ln+=(par->lambda)*(J[0][j][l]*J[0][j][l]+J[1][j][l]*J[1][j][l])/2;
@@ -406,11 +455,13 @@ void dqpl(const gsl_vector *v,void *params,gsl_vector *df){  // 1st derivatives
   int ymax=(q_null ? 1 : 2);
   for(int y=0;y<ymax;y++){
     h[y].resize(L);
+    if(q_qtil) continue;
     J[y].resize(nsnp);
     for(int j=0;j<nsnp;j++) J[y][j].resize(L*L);
   }
   for(int y=0;y<ymax;y++) for(int l0=0;l0<L;l0++){      // extract parameters
     h[y][l0]=gsl_vector_get(v,m++);
+    if(q_qtil) continue;
     for(int j=0;j<nsnp;j++){
       if(j==i0) continue;
       for(int l1=0;l1<L;l1++)
@@ -428,13 +479,15 @@ void dqpl(const gsl_vector *v,void *params,gsl_vector *df){  // 1st derivatives
     s1[l]=-(par->f1)[0][i0][l]+Lh*h[0][l];      
     if(!q_null) w1[l]=-(par->f1)[1][i0][l]+Lh*h[1][l];
   }
-  for(int j=0;j<nsnp;j++){
-    if(i0==j) continue;
-    s2[j].resize(L*L);
-    if(!q_null) w2[j].resize(L*L);
-    for(int l=0;l<L*L;l++){
-      s2[j][l]=-(par->f2)[0][i0][j][l]+(par->lambda)*J[0][j][l];
-      if(!q_null) w2[j][l]=-(par->f2)[1][i0][j][l]+(par->lambda)*J[1][j][l];
+  if(!q_qtil){
+    for(int j=0;j<nsnp;j++){
+      if(i0==j) continue;
+      s2[j].resize(L*L);
+      if(!q_null) w2[j].resize(L*L);
+      for(int l=0;l<L*L;l++){
+        s2[j][l]=-(par->f2)[0][i0][j][l]+(par->lambda)*J[0][j][l];
+        if(!q_null) w2[j][l]=-(par->f2)[1][i0][j][l]+(par->lambda)*J[1][j][l];
+      }
     }
   }
 
@@ -445,14 +498,16 @@ void dqpl(const gsl_vector *v,void *params,gsl_vector *df){  // 1st derivatives
     for(int a=0;a<L;a++){
       double e=h[0][a];
       if(!q_null) e+=h[1][a]*y;
-      for(int j=0;j<nsnp;j++){
-        if(i0==j) continue;
-        int b=2*(par->ai)[n][2*j]+(par->ai)[n][2*j+1];
-        int jb=code(b,model);
-        if(jb>0){
-          e+=J[0][j][2*a+jb-1];
-          if(!q_null)
-            e+=J[1][j][2*a+jb-1]*y;
+      if(!q_qtil){
+        for(int j=0;j<nsnp;j++){
+          if(i0==j) continue;
+          int b=2*(par->ai)[n][2*j]+(par->ai)[n][2*j+1];
+          int jb=code(b,model);
+          if(jb>0){
+            e+=J[0][j][2*a+jb-1];
+            if(!q_null)
+              e+=J[1][j][2*a+jb-1]*y;
+          }
         }
       }
       ha[a]=e;
@@ -462,6 +517,7 @@ void dqpl(const gsl_vector *v,void *params,gsl_vector *df){  // 1st derivatives
       double f=exp(ha[l0])/z/nind;
       s1[l0]+=f;
       if(!q_null) w1[l0]+=f*y;
+      if(q_qtil) continue;
       for(int j=0;j<nsnp;j++){
         if(i0==j) continue;
         int b=2*(par->ai)[n][2*j]+(par->ai)[n][2*j+1];
@@ -478,6 +534,7 @@ void dqpl(const gsl_vector *v,void *params,gsl_vector *df){  // 1st derivatives
   for(int y=0;y<ymax;y++) for(int l0=0;l0<L;l0++){
     if(y==0) gsl_vector_set(df,m++,s1[l0]);
     else gsl_vector_set(df,m++,w1[l0]);
+    if(q_qtil) continue;
     for(int j=0;j<nsnp;j++){
       if(i0==j) continue;
       for(int l1=0;l1<L;l1++){
@@ -510,7 +567,11 @@ double qt_pl(bool q_null,int i0,const vector<vector<bool> > &ai,const vector<dou
   Pareq par={q_null,i0,ai,yk,f1,f2,lambda};
 
   int nsnp=f1[0].size();
-  int ndim=(!q_null? 2*L+2*(nsnp-1)*L*L : L+(nsnp-1)*L*L);
+  int ndim=0;
+  if(!q_qtil)
+    ndim=(!q_null? 2*L+2*(nsnp-1)*L*L : L+(nsnp-1)*L*L);
+  else
+    ndim=(!q_null? 2*L : L);
 
   my_func.n=ndim;
   my_func.f=qpl;
@@ -550,6 +611,7 @@ double qt_pl(bool q_null,int i0,const vector<vector<bool> > &ai,const vector<dou
   int m=0;
   for(int y=ymin;y<ymax;y++) for(int l0=0;l0<L;l0++){
     h[y][i0][l0]=gsl_vector_get(s->x,m++);            
+    if(q_qtil) continue;
     for(int j=0;j<nsnp;j++){
       if(j==i0) continue;
       for(int l1=0;l1<L;l1++)

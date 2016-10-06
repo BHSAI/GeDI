@@ -47,6 +47,8 @@ bool assoc(double f1[2][2],int nind[2],double &q,double &alpha,double beta[]);
 
 bool qt_assoc(const std::vector<short> &ak,const std::vector<double> &yk,double f1[2],double fry[2],int &nind,double &q,std::vector<double> &h);
 
+bool qtlr_assoc(const std::vector<short> &ak,const std::vector<double> &yk,double f1[2],int &nind,double &q,std::vector<double> &h);
+
 int code(int a,Model model);
 
 bool il_dlr(double &q,double &alpha,double beta[],const std::vector<std::vector<short> > &ani);
@@ -72,8 +74,17 @@ double cl_gdi(const std::vector<std::vector<std::vector<std::vector<bool> > > > 
 double cl_dlr(const std::vector<std::string> &rs,
     const std::vector<std::vector<std::vector<bool> > > &ai,double lambda,Theta &th,bool q_qi);
 
+double cl_qtlr(const std::vector<std::string> &rs,const std::vector<std::vector<std::vector<bool> > > &ai,const std::vector<double> &yk,double lambda,Theta &th,bool q_qi);
+
 void pr_cl(std::ofstream &of,const std::vector<std::vector<std::vector<bool> > > &aw,
     std::vector<std::vector<double> > &risk);
+
+void pr_cl_qt(std::ofstream &of,const std::vector<std::vector<std::vector<std::vector<bool> > > > &aw,
+    const std::vector<std::vector<double> > &yk,Theta_qt &th_qt,std::vector<std::vector<double> > &risk,
+    bool q_il);
+
+void pr_cl_qtlr(std::ofstream &of,const std::vector<std::vector<std::vector<std::vector<bool> > > > &ai,
+    const std::vector<std::vector<double> > &yk,Theta &th,std::vector<std::vector<double> > &risk);
 
 double lpr(int cc,const std::vector<std::vector<std::vector<bool> > > &ai,
     const std::vector<std::vector<double> > &f1,const std::vector<std::vector<std::vector<float> > > &f2,double lamda,double z[3],std::vector<std::vector<double> > &h,std::vector<std::vector<std::vector<float> > > &J,int i,int j,int s);
@@ -107,10 +118,11 @@ void cl_inf(std::vector<std::vector<std::vector<bool> > > &ai,const std::vector<
 
 void bin_read(std::string &meta,int &nsample,std::vector<std::vector<int> > &nptr,
     std::vector<std::vector<std::vector<bool> > > &ai,std::vector<std::string> &rs,
-    const std::vector<std::string> &exc_list,std::vector<std::vector<double> > &yk);
+    const std::vector<std::string> &exc_list,std::vector<std::vector<double> > &yk,bool q_lr);
 
 void par_out(std::ofstream &of,const std::vector<std::string> &ra,double dev,int nsig,
-      const std::vector<std::vector<std::vector<std::vector<bool> > > > &aw,Theta &th,Theta_qt &th_qt);
+      const std::vector<std::vector<std::vector<std::vector<bool> > > > &aw,Theta &th,Theta_qt &th_qt,
+      bool q_lr);
 
 void byte2bit(char dat,int bit[8]);
 

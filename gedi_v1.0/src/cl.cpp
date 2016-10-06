@@ -17,6 +17,7 @@
 #include <gsl/gsl_sf_pow_int.h>
 #include <gsl/gsl_multimin.h>
 #include <gsl/gsl_sf_gamma.h>
+#include <gsl/gsl_cdf.h>
 #include <gsl/gsl_sf_erf.h>
 #include <gsl/gsl_eigen.h>
 #include <gsl/gsl_min.h>
@@ -62,11 +63,14 @@ extern long End;         // end position (1-based)
 extern bool q_boot;      // flag for bootstrapping
 extern bool q_strict;    // flag for strict run
 extern bool q_qt;        // true if quantitative trait
+extern bool q_qtil;      // true if quantitative trait IL
+extern bool q_qtpl;      // true if using PL for IL in CL (!)
 extern int Seed;         // random no. seed
 #ifdef MPIP
-extern bool q_mfp;        // flag for parallel MF
+extern bool q_mfp;       // flag for parallel MF
 const int Nb=32;         // block size for parallel MF (ScaLAPACK)
 #endif
+const double Dy=0.01;    // integration grid size for trapezoidal rule
 
 struct Pares{            // bundles of parameters for minimization
   const vector<vector<vector<bool> > > &ai;
@@ -278,25 +282,29 @@ double pray(double y,void *params){   // returns Pr(ai|y)*Pr(y)*sqrt(2pi)*sigma 
 
   double f=1;
   for(int i=0;i<nsnp;i++){
-    double z=1;
     vector<double> eh(L);
+    double hmax=0;
     for(int l=0;l<L;l++){
       eh[l]=(par->h0)[i][l]+y*(par->h1)[i][l];
-      for(int j=i+1;j<nsnp;j++){
-        int b=2*(par->ai)[2*j]+(par->ai)[2*j+1];
-        int jb=code(b,model);
-        if(jb==0) continue;
-        eh[l]+=(par->J0)[i][j][2*l+jb-1]+y*(par->J1)[i][j][2*l+jb-1];
+      if(!q_qtil){
+        for(int j=i+1;j<nsnp;j++){
+          int b=2*(par->ai)[2*j]+(par->ai)[2*j+1];
+          int jb=code(b,model);
+          if(jb==0) continue;
+          eh[l]+=(par->J0)[i][j][2*l+jb-1]+y*(par->J1)[i][j][2*l+jb-1];
+        }
       }
-      eh[l]=exp(eh[l]);
-      z+=eh[l];
+      if(eh[l]>hmax) hmax=eh[l];
     }
+    double z=exp(-hmax);
+    for(int l=0;l<L;l++)
+      z+=exp(eh[l]-hmax);
     int a=2*(par->ai)[2*i]+(par->ai)[2*i+1];
     int ia=code(a,model);
     if(ia>0)
-      f*=eh[ia-1]/z;
+      f*=exp(eh[ia-1]-hmax)/z;
     else
-      f*=1/z;
+      f*=exp(-hmax)/z;
   }
   f*=exp(-y*y/2.0);
 
@@ -311,38 +319,90 @@ double npray(double y,void *params){
   return -pray(y,params);
 }
 
+// trapezoidal rule
+double trapez(void *param,double y0,double y1){
+
+  double pray(double y,void *param);
+  double sum=0;
+  int nk=(y1-y0)/Dy;
+  for(int k=0;k<=nk;k++){
+    double f=pray(y0+k*Dy,param);
+    if(k==0 || k==nk)
+      sum+=f;
+    else
+      sum+=2*f;
+  }
+
+  sum*=(y1-y0)/2/nk;
+  return sum;
+}
+
 void pr_cl_qt(ofstream &of,const vector<vector<vector<vector<bool> > > > &ai,
     const vector<vector<double> > &yk,Theta_qt &th_qt,vector<vector<double> > &risk){
 
-  gsl_integration_workspace *w=gsl_integration_workspace_alloc(1000);
-  gsl_function F;
-  F.function=&pray;
+//gsl_integration_workspace *w=gsl_integration_workspace_alloc(1000);
+//gsl_function F;
+//F.function=&pray;
+//double err;
 
   int nsample=ai.size();
-  double norm,mean,err;
-
+  double norm,mean;
 
   for(int s=0;s<nsample;s++){
     int nind=int(ai[s][0].size());
     for(int n=0;n<nind;n++){
       Pari par={0,ai[s][0][n],th_qt.h[0],th_qt.h[1],th_qt.J[0],th_qt.J[1]};
       void *param=(void *)&par;
-      F.params=param;
+//    F.params=param;
 //    ofstream pdf;
 //    pdf.open("pdf.dat",ios::out);
 //    for(double y=-5;y<5;y+=0.1)
 //      pdf << y << " " << pray(y,param) << endl;
 //    pdf.close();
 //    gsl_integration_qagi(&F,0,1e-2,1000,w,&norm,&err);
-      gsl_integration_qags(&F,-10,10,0,1e-7,1000,w,&norm,&err);
+//    gsl_integration_qags(&F,-10,10,0,1e-7,1000,w,&norm,&err);
+      norm=trapez(param,-10,10);
       par.expo=1;
 //    gsl_integration_qagi(&F,0,1e-2,1000,w,&mean,&err);
-      gsl_integration_qags(&F,-10,10,0,1e-7,1000,w,&mean,&err);
+//    gsl_integration_qags(&F,-10,10,0,1e-7,1000,w,&mean,&err);
+      mean=trapez(param,-10,10);
       mean/=norm;
+      double mean2=mean*qt_ysd[s]+qt_yav[s];
       double y=yk[s][n]*qt_ysd[s]+qt_yav[s];
-      of << setw(13) << left << mean << " " << y << endl;
+      of << setw(13) << left << mean2 << " " << y << endl;
       vector<double> dummy(2);
       dummy[0]=mean;
+      dummy[1]=yk[s][n];
+      risk.push_back(dummy);
+    }
+  }
+}
+
+void pr_cl_qtlr(ofstream &of,const vector<vector<vector<vector<bool> > > > &ai,
+    const vector<vector<double> > &yk,Theta &th,vector<vector<double> > &risk){
+
+  int nsample=ai.size();
+
+  for(int s=0;s<nsample;s++){
+    int nind=int(ai[s][0].size());
+    int nsnp=int(ai[s][0][0].size()/2);
+    for(int n=0;n<nind;n++){
+      double yp=th.alpha;
+      for(int i=0;i<nsnp;i++){
+        int a=2*ai[s][0][n][2*i]+ai[s][0][n][2*i+1];
+        int ia=code(a,model);
+        yp+=th.beta[i][0]*ia;
+        if(q_qtil) continue;
+        for(int j=i+1;j<nsnp;j++){
+          int b=2*ai[s][0][n][2*j]+ai[s][0][n][2*j+1];
+          int jb=code(b,model);
+          yp+=th.gamm[i][j][0]*ia*jb;
+        }
+      }
+      double y=yk[s][n]*qt_ysd[s]+qt_yav[s];
+      of << setw(13) << left << yp << " " << y << endl;
+      vector<double> dummy(2);
+      dummy[0]=yp;
       dummy[1]=yk[s][n];
       risk.push_back(dummy);
     }
@@ -383,7 +443,7 @@ void cl_tped(string &tped,string &tfam,string &meta,string &par,string &out_file
   if(bfile=="" && !q_metab)
     tped_read(tped,tfam,meta,par,nsample,nptr,ai,rs,exc_list,yk);   // read genotypes
   else
-    bin_read(meta,nsample,nptr,ai,rs,exc_list,yk);
+    bin_read(meta,nsample,nptr,ai,rs,exc_list,yk,q_lr);
 
   cl_inf(ai,nptr,yk,out_file,par,q_lr,q_pr,q_qi,nsample,rs);     // CL inference
 }
@@ -405,7 +465,7 @@ int myrandom(int i){
 // reads data from binary files
 void bin_read(string &meta,int &nsample,vector<vector<int> > &nptr,
     vector<vector<vector<bool> > > &ai,vector<string> &rs,const vector<string> &exc_list,
-    vector<vector<double> > &yk){
+    vector<vector<double> > &yk,bool q_lr){
 
   nsample=0;  // no. of samples
 
@@ -436,11 +496,8 @@ void bin_read(string &meta,int &nsample,vector<vector<int> > &nptr,
 
   int nind[2]={0,};
   nptr.resize(nsample+1);
-  vector<vector<short> > phe;
-  if(!q_qt)
-    phe.resize(nsample);
-  else
-    yk.resize(nsample);
+  vector<vector<short> > phe(nsample);
+  if(q_qt) yk.resize(nsample);
 
   //read fam files
   if(q_qt){
@@ -496,7 +553,7 @@ void bin_read(string &meta,int &nsample,vector<vector<int> > &nptr,
       }
     }
     file.close();
-    if(q_qt){
+    if(q_qt && !q_lr){
       yave/=nind[0];
       var=sqrt(var/(nind[0]-1));
       for(int k=0;k<nind[0];k++)
@@ -1067,10 +1124,14 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
     if(!q_cv){
       vector<vector<vector<vector<bool> > > > av(1);   // genotype subset from snps in parameter file
       read_par_cl(ai,par,av[0],rs,th);     // read parameters
-      if(!q_qt)
-        pr_cl(of,av,th,risk);                // do prediction
+      if(q_qt){
+        if(!q_lr)
+          pr_cl_qt(of,av,yk,th_qt,risk);       
+        else
+          pr_cl_qtlr(of,av,yk,th,risk);   // ridge regression
+      }
       else
-        pr_cl_qt(of,av,yk,th_qt,risk);             // do prediction
+        pr_cl(of,av,th,risk);                // do prediction
       sort(risk.begin(),risk.end(),comp);
       roc(ocv,risk);
     }
@@ -1079,13 +1140,18 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
         risk.resize(0);
         double s=0;
         double lnp=0;
+        if(q_qt && q_lr) Lh=para[k];
         for(int nv=0;nv<ncv;nv++){
           if(master){
             if(q_mf)
               cout << "Cross-validation run " << nv+1 << " with epsilon = " << para[k] << endl;
-            else
+            else{
+              if(!q_qtil)
                 cout << "Cross-validation run " << nv+1 << " with lambda = (" << Lh
                      << ", " << para[k] << ")\n";
+              else
+                cout << "Cross-validation run " << nv+1 << " with lambda = " << Lh << endl;
+            }
           }
           vector<vector<vector<vector<bool> > > > av(nsample);  // genotype array for training set
           vector<vector<vector<vector<bool> > > > aw(nsample);  // genotype array for test set
@@ -1106,9 +1172,15 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
           else
             for(int s=0;s<nsample;s++){
               if(nsample>1) if(master) cout <<"Sample #" << s+1 << ": \n";
-              dev+=cl_dlr(ra,av[s],para[k],th,q_qi);
+              if(!q_qt)
+                dev+=cl_dlr(ra,av[s],para[k],th,q_qi);
+              else
+                dev+=cl_qtlr(ra,av[s],ykv[s],para[k],th,q_qi);
             }
-          if(master) cout << "Collective likelihood ratio statistic: " << dev << endl;
+          if(master){
+            if(!(q_qt && q_lr))
+              cout << "Collective likelihood ratio statistic: " << dev << endl;
+          }
           if(q_pout){
             double df=nsample*(L*nsig+L*L*nsig*(nsig-1)/2);
             if(master) cout << "Degrees of freedom: " << df << endl;
@@ -1118,10 +1190,14 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
               lnp+=log(p);
             }
           }
-          if(!q_qt)
-            pr_cl(of,aw,th,risk);
+          if(q_qt){
+            if(!q_lr)
+              pr_cl_qt(of,aw,ykw,th_qt,risk);
+            else
+              pr_cl_qtlr(of,aw,ykw,th,risk);
+          }
           else
-            pr_cl_qt(of,aw,ykw,th_qt,risk);
+            pr_cl(of,aw,th,risk);
         }
         s/=ncv;
         if(master) cout << "Mean SNP number: " << s << endl;
@@ -1129,7 +1205,10 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
         if(master){
           if(q_pout) cout << "Mean p-value: " << exp(lnp) << endl;
           if(!q_mf){
-            cout << "lambda = (" << Lh << ", " << para[k] << ")\n";
+            if(!q_qtil)
+              cout << "lambda = (" << Lh << ", " << para[k] << ")\n";
+            else
+              cout << "lambda = " << para[k] << endl;
             ocv << Lh << " " << para[k] << " ";
           }
           else{
@@ -1160,26 +1239,36 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
   }
   double dev=0;
   for(unsigned int k=0;k<para.size();k++){
+    if(q_qt && q_lr) Lh=para[k];
     if(q_ee || q_mf || q_pl)
       dev=cl_gdi(aw,yk,q_qi,ra,para[k],nptr,th,th_qt);  // GDI
     else
-      for(int s=0;s<nsample;s++)
-        dev+=cl_dlr(ra,aw[s],para[k],th,q_qi); // LR
-    if(master) par_out(of,ra,dev,nsig,aw,th,th_qt);
+      for(int s=0;s<nsample;s++){
+        if(!q_qt)
+          dev+=cl_dlr(ra,aw[s],para[k],th,q_qi); // LR
+        else
+          dev+=cl_qtlr(ra,aw[s],ykw[s],para[k],th,q_qi);
+      }
+    if(master) par_out(of,ra,dev,nsig,aw,th,th_qt,q_lr);
   }
   if(master) of.close();
 }
 
 void par_out(ofstream &of,const vector<string> &rs,double dev,int nsig,
-    const vector<vector<vector<vector<bool> > > > &aw,Theta &th,Theta_qt &th_qt){
+    const vector<vector<vector<vector<bool> > > > &aw,Theta &th,Theta_qt &th_qt,bool q_lr){
 
-  cout << "Collective likelihood ratio statistic: " << dev << endl;
   int nsample=aw.size();
-  double df=nsample*(L*nsig+L*L*nsig*(nsig-1)/2);
-  cout << "Degrees of freedom: " << df << endl;
-  if(q_pout){
-    double lnp= (dev>=0 ? gsl_sf_gamma_inc_Q(0.5*df,dev/2) : 1 );
-    cout << "p-value: " << lnp << endl << endl;
+  if(master){
+    if(!(q_qt && q_lr)){
+      cout << "Collective likelihood ratio statistic: " << dev << endl;
+      int nsample=aw.size();
+      double df=nsample*(L*nsig+L*L*nsig*(nsig-1)/2);
+      cout << "Degrees of freedom: " << df << endl;
+      if(q_pout){
+        double lnp= (dev>=0 ? gsl_sf_gamma_inc_Q(0.5*df,dev/2) : 1 );
+        cout << "p-value: " << lnp << endl << endl;
+      }
+    }
   }
 
   if(!q_qt){    // case-control
@@ -1198,30 +1287,37 @@ void par_out(ofstream &of,const vector<string> &rs,double dev,int nsig,
     Pd/=teff;
     of << "alpha: " << setw(12) << th.alpha << " Pd: " << setw(12) << Pd << endl;
   }
+  if(q_qt && q_lr)
+    of << "alpha: " << setw(12) << th.alpha << endl;
   int ymax=(q_qt ? 2 : 1);
+  int Lmax=L;
+  if(q_qt && q_lr){
+    ymax=1;
+    Lmax=1;
+  }
   for(int y=0;y<ymax;y++){
-    for(int i=0;i<nsig;i++) for(int l0=0;l0<L;l0++){
+    for(int i=0;i<nsig;i++) for(int l0=0;l0<Lmax;l0++){
       of << left;
       of << setw(15) << rs[i] << " ";
       of << right;
-      for(int j=0;j<i;j++) for(int l1=0;l1<L;l1++){
-        if(!q_qt)
+      for(int j=0;j<i;j++) for(int l1=0;l1<Lmax;l1++){
+        if(!q_qt || (q_qt && q_lr))
           of << setw(11) << th.gamm[i][j][2*l0+l1] << " ";
         else
           of << setw(11) << th_qt.J[y][i][j][2*l0+l1] << " ";
       }
       for(int l1=0;l1<L;l1++){
         if(l0==l1){
-          if(!q_qt)
+          if(!q_qt || (q_qt && q_lr))
             of << setw(11) << th.beta[i][l0] << " ";
           else
             of << setw(11) << th_qt.h[y][i][l0] << " ";
         }
-        else
+        else if(!q_qt || (q_qt && !q_lr))
           of << setw(11) << 0 << " ";
       }
-      for(int j=i+1;j<nsig;j++) for(int l1=0;l1<L;l1++){
-        if(!q_qt)
+      for(int j=i+1;j<nsig;j++) for(int l1=0;l1<Lmax;l1++){
+        if(!q_qt || (q_qt && q_lr))
           of << setw(11) << th.gamm[i][j][2*l0+l1] << " ";
         else
           of << setw(11) << th_qt.J[y][i][j][2*l0+l1] << " ";
@@ -1326,16 +1422,18 @@ void snp_select(const vector<vector<vector<bool> > > &ai,int nv,
   for(int i=0;i<nsnp;i++){
     double qtot=0;
     int nscount=0;
+    int nmist=0;
     for(int s=0;s<nsample;s++){
       double fr1[2][2]={{0,}};
       int nmiss[2]={0,};
       double fry[2]={0,};   // y-weighted freq. for qt
       vector<short> ak;
+      vector<double> ykl;
       int ymax=(q_qt ? 1 : 2);
       for(int y=0;y<ymax;y++){
         int nsize=nptr[s+1][y]-nptr[s][y];
-        if(y==0 && q_qt)
-          ak.resize(nsize);
+//      if(y==0 && q_qt)
+//        ak.resize(nsize);
         int nval=int(nsize/ncv);
         for(int n=0;n<nsize;n++){
           if(nv!=-1 && n>=nv*nval && n<(nv+1)*nval) continue;    // skip the test set
@@ -1347,8 +1445,10 @@ void snp_select(const vector<vector<vector<bool> > > &ai,int nv,
             if(q_qt && y==0)
               fry[a-1]+=yk[s][n];
           }
-          if(y==0 && q_qt)
-            ak[n]=a;
+          if(y==0 && q_qt){
+            ak.push_back(a);
+            ykl.push_back(yk[s][n]);
+          }
         }
         fr1[y][0]/=nmiss[y];
         fr1[y][1]/=nmiss[y];
@@ -1363,19 +1463,33 @@ void snp_select(const vector<vector<vector<bool> > > &ai,int nv,
       vector<double> h(2*L);
       if(!q_qt)
         nna=assoc(fr1,nmiss,q,alpha0,beta0);
-      else
-        nna=qt_assoc(ak,yk[s],fr1[0],fry,nmiss[0],q,h);
+      else{
+        if(q_qtpl)
+          nna=qt_assoc(ak,ykl,fr1[0],fry,nmiss[0],q,h);
+        else
+          nna=qtlr_assoc(ak,ykl,fr1[0],nmiss[0],q,h);
+      }
       if(nna){ 
         nscount++;
         qtot+=q;
+        nmist+=nmiss[0];
       }
     }
     if(nscount==0) continue;
     double df=L*nscount;
-    double pv= (qtot>0 ? gsl_sf_gamma_inc_Q(0.5*df,qtot/2) : 1);   // DOM or REC
+//  double pv= (qtot>0 ? gsl_sf_gamma_inc_Q(0.5*df,qtot/2) : 1);   // DOM or REC
 //  if(qtot<=0) continue;
 //  double pv= gsl_sf_gamma_inc_Q(0.5*df,qtot/2);
-    if(pv>pcut) continue;
+    if(pcut<1){
+      double pv=1;
+      if(!q_qt || q_qtpl){
+        if(qtot>0)
+          pv=gsl_cdf_chisq_Q(qtot,df);
+      }
+      else
+        pv=2*gsl_cdf_tdist_P(qtot,nmist-2);
+      if(pv>pcut) continue;
+    }
     slist.push_back(i);
     ra.push_back(rs[i]);
     nsig++;
@@ -1442,10 +1556,12 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,const vector<vec
   if(!q_marg) nsp=1;                         // not doing marginal: save memory
   h.resize(nsp);
   J.resize(nsp);
-  float mem=nsp*3*nsnp*(L*sizeof(double)+(nsnp-1)*L*L*sizeof(float)/2);  // memory required
-  if(mem>Max_mem){
-    if(master) cerr << "Maximum memory exceeded. Bye!\n";
-    end();
+  if(!q_qtil){
+    float mem=nsp*3*nsnp*(L*sizeof(double)+(nsnp-1)*L*L*sizeof(float)/2);  // memory required
+    if(mem>Max_mem){
+      if(master) cerr << "Maximum memory exceeded. Bye!\n";
+      end();
+    }
   }
   for(int s=0;s<nsp;s++){
     f1[s].resize(3);
@@ -1454,12 +1570,14 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,const vector<vec
     J[s].resize(3);
     for(int y=0;y<3;y++){
       h[s][y].resize(nsnp);
-      J[s][y].resize(nsnp);
+      if(!q_qtil)
+        J[s][y].resize(nsnp);
     }
     for(int i=0;i<nsnp;i++){
       for(int y=0;y<3;y++){
-        J[s][y][i].resize(nsnp);
         h[s][y][i].resize(L);
+        if(q_qtil) continue;
+        J[s][y][i].resize(nsnp);
         for(int j=0;j<nsnp;j++)
           J[s][y][i][j].resize(L*L);
       }
@@ -1467,8 +1585,12 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,const vector<vec
   }
 
   if(master){
-    if(q_ee || q_pl)
-      cout << "DDA inference with lambda = (" << Lh << ", " << lambda << ")\n";
+    if(q_ee || q_pl){
+      if(!q_qtil)
+        cout << "DDA inference with lambda = (" << Lh << ", " << lambda << ")\n";
+      else
+        cout << "DDA inference with lambda = " << Lh << endl;
+    }
     else if(q_mf)
       cout << "DDA inference with epsilon = " << lambda << endl;
   }
@@ -1522,6 +1644,7 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,const vector<vec
           h[si][y].resize(nsnp);
           for(int i=0;i<nsnp;i++){
             h[si][y][i].resize(L);
+            if(q_qtil) continue;
             for(int j=0;j<nsnp;j++) J[si][y][i][j].resize(L*L);
           }
         }
@@ -1597,7 +1720,8 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,const vector<vec
       lkl+=lks;
       qtot+=qtos;
 #endif
-      for(int y=0;y<2;y++) lnz[y]/=nind[y];
+      int ymax=(q_qt? 1: 2);
+      for(int y=0;y<ymax;y++) lnz[y]/=nind[y];
     }
 
     double neff=0;
@@ -1634,10 +1758,12 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,const vector<vec
         th_qt.J.resize(2);
         for(int y=0;y<2;y++){
           th_qt.h[y].resize(nsnp);
-          th_qt.J[y].resize(nsnp);
+          if(!q_qtil)
+            th_qt.J[y].resize(nsnp);
           for(int i=0;i<nsnp;i++){
             th_qt.h[y][i].resize(L);
             fill(th_qt.h[y][i].begin(),th_qt.h[y][i].end(),0);  // reset for 2nd runs etc
+            if(q_qtil) continue;
             th_qt.J[y][i].resize(nsnp);
             for(int j=0;j<nsnp;j++){
               th_qt.J[y][i][j].resize(L*L);
@@ -1648,6 +1774,7 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,const vector<vec
       }
       for(int y=0;y<2;y++) for(int i=0;i<nsnp;i++) for(int l0=0;l0<L;l0++){
         th_qt.h[y][i][l0]+=h[si][y][i][l0]*neff;
+        if(q_qtil) continue;
         for(int j=i+1;j<nsnp;j++) for(int l1=0;l1<L;l1++){
           th_qt.J[y][i][j][2*l0+l1]+=J[si][y][i][j][2*l0+l1]*neff;
           th_qt.J[y][j][i][2*l1+l0]=th_qt.J[y][i][j][2*l0+l1];
@@ -1674,6 +1801,7 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,const vector<vec
   else{
     for(int y=0;y<2;y++) for(int i=0;i<nsnp;i++) for(int l0=0;l0<L;l0++){
       th_qt.h[y][i][l0]/=teff;
+      if(q_qtil) continue;
       for(int j=i+1;j<nsnp;j++) for(int l1=0;l1<L;l1++){
         th_qt.J[y][i][j][2*l0+l1]/=teff;
         th_qt.J[y][j][i][2*l1+l0]/=teff;
