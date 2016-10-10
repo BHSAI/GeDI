@@ -361,6 +361,11 @@ int main(int argc,char* argv[]){
 
 // analysis section
 
+   if(!q_cl && !q_il){
+     if(master)
+       cerr << "Please specify the analysis to be performed: -il, -cl. Bye!\n";
+     end();
+   }
    if(q_il){
      if(master){
        cout << "Independent loci analysis\n\n";
@@ -408,6 +413,10 @@ int main(int argc,char* argv[]){
          if(master) cerr << "Please specify tped/tfam (or binary) file. Bye!\n";
          end();
        }
+     }
+     else{
+       q_qtil=q_pl=true;
+       cl_tped(tped_file,tfam_file,meta_file,par_file,out_file,q_lr,q_pr,q_qi);
      }
      if(q_cl){
        if(master) cerr << "IL or CL but not both\n";
@@ -514,11 +523,6 @@ int main(int argc,char* argv[]){
        if(master) cerr << "Input files not specified. Bye!\n";
        end();
      }
-   }
-   else{
-     if(master)
-       cerr << "Please specify the analysis to be performed: -il, -cl. Bye!\n";
-     end();
    }
 
    if(master)

@@ -597,8 +597,8 @@ double qt_pl(bool q_null,int i0,const vector<vector<bool> > &ai,const vector<dou
   }while(status==GSL_CONTINUE && iter <imax);
   if(status){
     if(master) cerr << " GSL iteration code " << status << endl;
-//  end();
-    return false;
+    end();
+//  return false;
   }
   if(iter==imax){
     if(master) cerr << "BFGS2 iteration failed to converge after " << imax << " iteration\n";

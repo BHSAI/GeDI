@@ -1240,7 +1240,8 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
   double dev=0;
   for(unsigned int k=0;k<para.size();k++){
     if(q_qt && q_lr) Lh=para[k];
-    if(q_ee || q_mf || q_pl)
+//  if(q_ee || q_mf || q_pl)
+    if(!q_lr)
       dev=cl_gdi(aw,yk,q_qi,ra,para[k],nptr,th,th_qt);  // GDI
     else
       for(int s=0;s<nsample;s++){
@@ -1259,8 +1260,8 @@ void par_out(ofstream &of,const vector<string> &rs,double dev,int nsig,
 
   int nsample=aw.size();
   if(master){
+    cout << "Collective likelihood ratio statistic: " << dev << endl;
     if(!(q_qt && q_lr)){
-      cout << "Collective likelihood ratio statistic: " << dev << endl;
       int nsample=aw.size();
       double df=nsample*(L*nsig+L*L*nsig*(nsig-1)/2);
       cout << "Degrees of freedom: " << df << endl;
@@ -1300,11 +1301,13 @@ void par_out(ofstream &of,const vector<string> &rs,double dev,int nsig,
       of << left;
       of << setw(15) << rs[i] << " ";
       of << right;
-      for(int j=0;j<i;j++) for(int l1=0;l1<Lmax;l1++){
-        if(!q_qt || (q_qt && q_lr))
-          of << setw(11) << th.gamm[i][j][2*l0+l1] << " ";
-        else
-          of << setw(11) << th_qt.J[y][i][j][2*l0+l1] << " ";
+      if(!q_qtil){
+        for(int j=0;j<i;j++) for(int l1=0;l1<Lmax;l1++){
+          if(!q_qt || (q_qt && q_lr))
+            of << setw(11) << th.gamm[i][j][2*l0+l1] << " ";
+          else
+            of << setw(11) << th_qt.J[y][i][j][2*l0+l1] << " ";
+        }
       }
       for(int l1=0;l1<L;l1++){
         if(l0==l1){
@@ -1316,11 +1319,13 @@ void par_out(ofstream &of,const vector<string> &rs,double dev,int nsig,
         else if(!q_qt || (q_qt && !q_lr))
           of << setw(11) << 0 << " ";
       }
-      for(int j=i+1;j<nsig;j++) for(int l1=0;l1<Lmax;l1++){
-        if(!q_qt || (q_qt && q_lr))
-          of << setw(11) << th.gamm[i][j][2*l0+l1] << " ";
-        else
-          of << setw(11) << th_qt.J[y][i][j][2*l0+l1] << " ";
+      if(!q_qtil){
+        for(int j=i+1;j<nsig;j++) for(int l1=0;l1<Lmax;l1++){
+          if(!q_qt || (q_qt && q_lr))
+            of << setw(11) << th.gamm[i][j][2*l0+l1] << " ";
+          else
+            of << setw(11) << th_qt.J[y][i][j][2*l0+l1] << " ";
+        }
       }
       of << endl;
     }
