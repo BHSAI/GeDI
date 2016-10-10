@@ -59,7 +59,15 @@ This option can be applied to large data sets (_m_ up to thousands) with some co
 
     --eps 0.1 
 
-(default). Although CL should become IL with "--eps 0", the outcomes will not be exactly same because in CL, missing genotypes are counted as major alleles, and MF includes one prior count of individual with uniform genotype frequencies to avoid singularity. One can experiment with different values or use [cross-validation](cv.md) to find an optimal condition.
+(default). Although CL should become IL with "--eps 0", the outcomes will not be exactly same because in CL, missing genotypes are counted as major alleles, and MF includes one prior count of individual with uniform genotype frequencies to avoid singularity. One can experiment with different values or use [cross-validation](cv.md) to find an optimal condition. As in PL, multiple values of eps can be specified for batch runs. 
+
+###3. Mean field parallel (MFP)
+
+In contrast to PL, which is automatically run in parallel if possible, MF used with -mf is serial by default. When compiled and run in MPI, a parallel version of MF (using SCALAPACK) can be specified by
+
+     --mfp
+
+Note that this parallel MFP can be slower than -mf unless the number of SNPs is larger than several hundreds.
 
 ###3. Exact enumeration (EE)
 
@@ -76,7 +84,11 @@ One can use logistic regression for CL inference by specifying
 
     -lr
 
+<<<<<<< HEAD
 This option behaves the same way as PL/EE (also using lambda). LR is not very scalable and usable for ~10 SNPs or less.
+=======
+This option behaves the same way as PL/EE (also using lambda). LR is not scalable beyond more than 10 SNPs.
+>>>>>>> qt
 
 ***
 [Up](README.md)

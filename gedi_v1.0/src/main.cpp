@@ -11,8 +11,10 @@
 
 using namespace std;
 
-Model model=DOM;
-int L=1;                   // model multiplicity
+//Model model=DOM;
+//int L=1;                   // model multiplicity
+Model model=GEN;
+int L=2;                   // model multiplicity
 string Mname[4]={"DOM","REC","GEN","ADD"};
 bool q_minor_ctl=false;    // true if minor allele is wrt control group
 bool q_cv=false;           // true if cross-validation
@@ -31,6 +33,11 @@ bool q_pi=true;            // flag for single-locus p-value
 bool q_pij=false;          // flag for interaction p-values
 bool q_dump=false;         // flag for writing SNP selection lists during IL-cv
 bool q_pout=false;         // flag for asymptotic p-value output
+bool q_qt=false;           // flag for quantitative trait
+bool q_qtpl=false;         // flag for maximum likelihood IL
+bool q_qtil=false;         // flag for qt-IL
+bool q_covar=false;        // flag for covariates
+bool q_nsvd=false;
 string excl_file="";       // snp exclusion list file 
 double pcut=-1;            // p-value cutoff for cross-validation
 double tol=1.0e-5;         // iteration tolerance
@@ -38,9 +45,10 @@ vector<double> lambda;     // penalizer
 vector<double> eps;        // MFA regularizer
 double Prev=-1;            // disease prevalence
 double Lh=0;               // penalizer for h
-unsigned int imax=10000;    // maximum no. of iteration
+unsigned int imax=10000;   // maximum no. of iteration
 string qc_outf="qc.tped";  // quality control mode output genotype file
 string bfile="";           // binary data file prefix
+string cvar_file="";       // covariate file
 int ncv=5;                 // order of cross-validation
 int meta=1;                // no. of samples in meta-analysis
 int Npr=10000;             // print freq. for tped SNP numbers
@@ -53,7 +61,7 @@ long End=-1;               // end position (1-based)
 bool q_boot=false;         // flag for boostrapping
 bool q_strict=false;       // flag for being strict
 int Seed=1;                // random no. seed
-float Max_mem=1.0e6;       // maximum memory
+float Max_mem=3.0e9;       // maximum memory
 
 void estop(int ecode){
    
@@ -134,12 +142,18 @@ int main(int argc,char* argv[]){
          q_pr=true;
        else if(flag=="ma_ctl")
          q_minor_ctl=true;
-       else if(flag=="dominant")
+       else if(flag=="dominant"){
          model=DOM;
-       else if(flag=="recessive")
+         L=1;
+       }
+       else if(flag=="recessive"){
          model=REC;
-       else if(flag=="additive")
+         L=1;
+       }
+       else if(flag=="additive"){
          model=ADD;
+         L=1;
+       }
        else if(flag=="genotypic"){
          model=GEN;
          L=2;
@@ -175,6 +189,14 @@ int main(int argc,char* argv[]){
          q_mf=true;
        else if(flag=="pvout")
          q_pout=true;
+       else if(flag=="qt")
+         q_qt=true;
+       else if(flag=="qtpl"){
+         q_qt=true;
+         q_qtpl=true;
+       }
+       else if(flag=="nsvd")
+         q_nsvd=true;
 #ifdef MPIP
        else if(flag=="mfp"){
          q_mfp=true;
@@ -248,6 +270,10 @@ int main(int argc,char* argv[]){
            eps.push_back(atof(nu.c_str()));
            if(i==argc) break;
          }
+       }
+       else if(flag=="covar"){ // covariate file
+         cvar_file=argv[i++];
+         q_covar=true;
        }
        else if(flag=="lh")
          Lh=atof(argv[i++]);
@@ -335,8 +361,16 @@ int main(int argc,char* argv[]){
 
 // analysis section
 
+   if(!q_cl && !q_il){
+     if(master)
+       cerr << "Please specify the analysis to be performed: -il, -cl. Bye!\n";
+     end();
+   }
    if(q_il){
-     if(master) cout << "Independent loci analysis\n\n";
+     if(master){
+       cout << "Independent loci analysis\n\n";
+       if(q_qt) cout << "Quantitative trait\n\n";
+     }
      if(q_pr){
        if(master) cout << "Prediction mode\n\n";
        if(q_par){
@@ -361,30 +395,39 @@ int main(int argc,char* argv[]){
      }
      if(q_meta || q_metab)
        if(master) cout << "Meta analysis with file lists from " << meta_file << endl << endl;
-     if(q_tped || q_meta || q_metab || bfile!=""){
-       if(!q_pr)
-         if(bfile!="" || q_metab)
-           il_bed(meta_file,out_file,q_lr);
-         else
-           il_tped(tped_file,tfam_file,meta_file,out_file,q_lr);
+     if(!(q_qt && q_pr)){        // QT prediction uses CL with J=0
+       if(q_tped || q_meta || q_metab || bfile!=""){
+         if(!q_pr)
+           if(bfile!="" || q_metab)
+             il_bed(meta_file,out_file,q_lr);
+           else
+             il_tped(tped_file,tfam_file,meta_file,out_file,q_lr);
+         else{
+           if(bfile!="" || q_metab)
+             il_bpr(meta_file,out_file,par_file,q_lr);
+           else
+             pr_tped(tped_file,tfam_file,meta_file,par_file,out_file);
+         }
+       }
        else{
-         if(bfile!="" || q_metab)
-           il_bpr(meta_file,out_file,par_file,q_lr);
-         else
-           pr_tped(tped_file,tfam_file,meta_file,par_file,out_file);
+         if(master) cerr << "Please specify tped/tfam (or binary) file. Bye!\n";
+         end();
        }
      }
      else{
-       if(master) cerr << "Please specify tped/tfam (or binary) file. Bye!\n";
-       end();
+       q_qtil=q_pl=true;
+       cl_tped(tped_file,tfam_file,meta_file,par_file,out_file,q_lr,q_pr,q_qi);
      }
      if(q_cl){
        if(master) cerr << "IL or CL but not both\n";
        end();
      }
    }
-   else if(q_cl){
-     if(master) cout << "Collective loci analysis\n\n";
+   if(q_cl){
+     if(master){
+       cout << "Collective loci analysis\n\n";
+       if(q_qt) cout << "Quantitative trait\n\n";
+     }
      if(!q_ee && !q_mf && !q_lr) q_pl=true;   // default
      if(q_ee+q_mf+q_lr+q_pl!=1){
        if(master) cerr << "Please specify only one among -pseudo, -ee, -mf, -lr. Bye!\n";
@@ -431,7 +474,12 @@ int main(int argc,char* argv[]){
          }
        }
        else if(q_lr){
-         if(master) cout << "Logistic regression\n\n";
+         if(master) {
+           if(!q_qt)
+             cout << "Logistic regression\n\n";
+           else
+             cout << "Ridge regression\n\n";
+         }
        }
        else{           // PSL
          q_pl=true;
@@ -466,10 +514,15 @@ int main(int argc,char* argv[]){
        end();
      }
    }
-   else{
-     if(master)
-       cerr << "Please specify the analysis to be performed: -il, -cl. Bye!\n";
-     end();
+   else if(q_qt){   // qt IL
+     if(q_tped || q_meta || q_metab || bfile!=""){
+       q_qtil=q_pl=true;
+       cl_tped(tped_file,tfam_file,meta_file,par_file,out_file,q_lr,q_pr,q_qi);
+     }
+     else{
+       if(master) cerr << "Input files not specified. Bye!\n";
+       end();
+     }
    }
 
    if(master)
