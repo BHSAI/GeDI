@@ -84,11 +84,7 @@ One can use logistic regression for CL inference by specifying
 
     -lr
 
-<<<<<<< HEAD
-This option behaves the same way as PL/EE (also using lambda). LR is not very scalable and usable for ~10 SNPs or less.
-=======
 This option behaves the same way as PL/EE (also using lambda). LR is not scalable beyond more than 10 SNPs.
->>>>>>> qt
 
 ***
 [Up](README.md)
