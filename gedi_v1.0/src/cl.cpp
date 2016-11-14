@@ -51,6 +51,7 @@ extern bool q_pi;        // true if single-locus p-value
 extern bool q_pij;       // true if interaction p-value
 extern bool q_qij;       // true if interaction LR statistic
 extern bool q_pout;      // true if p-value output
+extern bool q_Lh;        // true if lh=lJ
 extern int ncv;
 extern string excl_file; // snp exclusion list
 extern int nproc;        // no. of processors
@@ -1140,7 +1141,8 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
         risk.resize(0);
         double s=0;
         double lnp=0;
-        if(q_qt && q_lr) Lh=para[k];
+//      if(q_qt && q_lr) Lh=para[k];
+        if(q_qt || q_Lh) Lh=para[k];
         for(int nv=0;nv<ncv;nv++){
           if(master){
             if(q_mf)
@@ -1239,7 +1241,8 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
   }
   double dev=0;
   for(unsigned int k=0;k<para.size();k++){
-    if(q_qt && q_lr) Lh=para[k];
+//  if(q_qt && q_lr) Lh=para[k];
+    if(q_qt || q_Lh) Lh=para[k];
 //  if(q_ee || q_mf || q_pl)
     if(!q_lr)
       dev=cl_gdi(aw,yk,q_qi,ra,para[k],nptr,th,th_qt);  // GDI
@@ -1816,8 +1819,14 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,const vector<vec
 
   if(master) cout << endl;
 
-  if(q_marg)
+  if(q_marg){
+    if(q_qt){
+      if(master)
+        cerr << "Marginal with QT not implemented. Bye!\n";
+      end();
+    }
     marginal(ai,f1,f2,rs,lkl,z,lambda,nptr);
+  }
 
   return qtot;
 }
