@@ -370,7 +370,8 @@ void pr_cl_qt(ofstream &of,const vector<vector<vector<vector<bool> > > > &ai,
       mean/=norm;
       double mean2=mean*qt_ysd[s]+qt_yav[s];
       double y=yk[s][n]*qt_ysd[s]+qt_yav[s];
-      of << setw(13) << left << mean2 << " " << y << endl;
+      if(of.is_open())
+        of << setw(13) << left << mean2 << " " << y << endl;
       vector<double> dummy(2);
       dummy[0]=mean;
       dummy[1]=yk[s][n];
@@ -401,7 +402,8 @@ void pr_cl_qtlr(ofstream &of,const vector<vector<vector<vector<bool> > > > &ai,
         }
       }
       double y=yk[s][n]*qt_ysd[s]+qt_yav[s];
-      of << setw(13) << left << yp << " " << y << endl;
+      if(of.is_open())
+        of << setw(13) << left << yp << " " << y << endl;
       vector<double> dummy(2);
       dummy[0]=yp;
       dummy[1]=yk[s][n];
@@ -1240,7 +1242,9 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
     end();
   }
   double dev=0;
+  ofstream dummy;
   for(unsigned int k=0;k<para.size();k++){
+    risk.resize(0);
 //  if(q_qt && q_lr) Lh=para[k];
     if(q_qt || q_Lh) Lh=para[k];
 //  if(q_ee || q_mf || q_pl)
@@ -1254,6 +1258,13 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
           dev+=cl_qtlr(ra,aw[s],ykw[s],para[k],th,q_qi);
       }
     if(master) par_out(of,ra,dev,nsig,aw,th,th_qt,q_lr);
+    if(q_qt){
+      if(!q_lr)
+        pr_cl_qt(dummy,aw,ykw,th_qt,risk);
+      else
+        pr_cl_qtlr(dummy,aw,ykw,th,risk);
+    }
+    roc(ocv,risk);
   }
   if(master) of.close();
 }
@@ -1361,7 +1372,6 @@ void roc(ofstream &ocv,vector<vector<double> > &risk){
     double tp=0;
     double fprev=0;
     double r2=0;
-    double r0=0;
     double r1=0;
     double v0=0;
     double v1=0;
@@ -1369,7 +1379,6 @@ void roc(ofstream &ocv,vector<vector<double> > &risk){
       if(q_qt){
         if(master) of << risk[k][0] << " " << risk[k][1] << endl;
         r2+=risk[k][0]*risk[k][1];
-        r0+=risk[k][0];
         r1+=risk[k][1];
         v0+=risk[k][0]*risk[k][0];
         v1+=risk[k][1]*risk[k][1];
@@ -1392,10 +1401,10 @@ void roc(ofstream &ocv,vector<vector<double> > &risk){
     if(!master) return;
     of.close();
     if(q_qt){
-      r2=ntot*r2-r0*r1;
-      r2=r2*r2/(ntot*v0-r0*r0)/(ntot*v1-r1*r1);
+      r2=1-(v1-2*r2+v0)/(v1-r1*r1/ntot);            // variance explained
       cout << "R-square = " << r2 << endl << endl;
-      ocv << r2 << endl;
+      if(ocv.is_open())
+        ocv << r2 << endl;
       return;
     }
 
