@@ -268,13 +268,11 @@ bool qt_assoc(const vector<short> &ak,const vector<double> &yk,double f1[2],doub
   }while(status==GSL_CONTINUE && iter <imax);
   if(status){
     if(master) cerr << " GSL iteration code " << status << endl;
-//  end();
-    return false;
+    end();
   }
   if(iter==imax){
     if(master) cerr << "BFGS2 iteration failed to converge after " << imax << " iteration\n";
-//  end();
-    return false;
+    end();
   }
 
   int m=0;
@@ -316,7 +314,7 @@ bool qt_assoc(const vector<short> &ak,const vector<double> &yk,double f1[2],doub
 }
 
 // linear regression QT
-bool qtlr_assoc(const vector<short> &ak,const vector<double> &yk,double f1[2],int &nind,double &q,vector<double> &h){
+bool qtlr_assoc(const vector<short> &ak,const vector<double> &yk,double f1[2],int &nind,double &q,vector<double> &h,double &r2){
 
   double xave=0;
   double yave=0;
@@ -331,12 +329,14 @@ bool qtlr_assoc(const vector<short> &ak,const vector<double> &yk,double f1[2],in
   yave/=nind;
   double s0=0;
   double s1=0;
+  double y2=0;
   for(int k=0;k<nind;k++){
     int a=ak[k];
     a=code(a,model);
     double y=yk[k];
     s0+=(y-yave)*(a-xave);
     s1+=(a-xave)*(a-xave);
+    y2+=y*y;
   }
   double beta1=s0/s1;
   double beta0=yave-beta1*xave;
@@ -348,7 +348,7 @@ bool qtlr_assoc(const vector<short> &ak,const vector<double> &yk,double f1[2],in
     double df=yk[k]-beta0-beta1*a;
     s2+=df*df;
   }
-//double se=sqrt(s2/(nind-2)/s1);
+  r2=1-s2/(y2-nind*yave*yave);
   q=beta1*sqrt(s1*(nind-2)/s2);
 
   h[0]=beta0;
@@ -602,8 +602,8 @@ double qt_pl(bool q_null,int i0,const vector<vector<bool> > &ai,const vector<dou
   }
   if(iter==imax){
     if(master) cerr << "BFGS2 iteration failed to converge after " << imax << " iteration\n";
-//  end();
-    return false;
+    end();
+//  return false;
   }
 
   int ymin=(q_null ? 2 : 0);

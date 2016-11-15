@@ -42,116 +42,35 @@ extern bool q_qtil;     // true if qt-IL
 //extern vector<double> beta;                      // differences
 //extern vector<vector<double> > gamm;
 
-struct Pal{
-  const vector<vector<vector<bool> > > &ai;
-  double lambda;
-  int i0;
-  int j0;
-};
+//struct Pal{
+//  const vector<vector<vector<bool> > > &ai;
+// double lambda;
+//  int i0;
+//  int j0;
+//};
 
 void py(const vector<bool> &ai,double &h,double &p,double alpha,const vector<vector<double> > &beta,
     const vector<vector<vector<double> > > &gamm);
 double cl_min(const vector<string> &rs,const vector<vector<bool> > &ai,const vector<double> &yk,
-    double lambda,Theta &th,int i0,int j0);
+    double lambda,Theta &th);
 
 double cl_qtlr(const vector<string> &rs,const vector<vector<vector<bool> > > &ai,const vector<double> &yk,
     double lambda,Theta &th,bool q_qi){
 
+  if(q_marg){
+    if(master) cerr << "Marginal under QT not implemented. Bye!\n";
+    end();
+  }
+
   if(master) cout << "Ridge regression with lambda = " << lambda << "\n\n";
-
-  double dev=cl_min(rs,ai[0],yk,lambda,th,-1,-1);
-
-  if(!q_marg)
-    return dev;
-
-  int nsnp=ai[0][0].size()/2;
-  vector<double> pi(nsnp);
-  vector<vector<double> > pij(nsnp);
-
-  if(master){
-    if(q_qij || q_pij) cout << " Single-locus/interaction statistics calculation\n";
-    else cout << " Single-locus statistics calculation\n";
-  }
-
-  ofstream fq;
-  if(master){
-    if(q_qi)
-      fq.open("gedi.qi",ios::out);
-    else if(q_pi)
-      fq.open("gedi.pi",ios::out);
-  }
-  double q=0;
-  for(int i=0;i<nsnp;i++){
-    q=2*(dev-cl_min(rs,ai[0],yk,lambda,th,i,-1));
-    if(q_qi)
-      pi[i]=q;
-    else{
-      int df=L;
-      pi[i]=q2p(q,df);
-    }
-    if(master){
-      if(q_pi)
-        cout << " SNP#"  << setw(4) << i+1 << " " << rs[i] << " p-value: " << pi[i] << endl;
-      else
-        cout << " SNP#"  << setw(4) << i+1 << " " << rs[i] << " LR-statistic: " << pi[i] << endl;
-      fq << left;
-      fq << setw(15) << rs[i] << " ";
-      fq << setw(11) << pi[i] << " ";
-      fq << endl;
-    }
-  }
-  if(master){
-    fq.close();
-    if(q_pi) cout << " \n Single-locus p-value results written to gedi.pi\n\n";
-    else cout << " \n Single-locus p-value results written to gedi.qi\n\n";
-  }
-
-  if(!q_qij && !q_pij) return dev;
-
-  for(int i=0;i<nsnp;i++){
-    pij[i].resize(nsnp);
-    for(int j=i+1;j<nsnp;j++){
-      q=2*(dev-cl_min(rs,ai[0],yk,lambda,th,i,j));
-      if(q_qij)
-        pij[i][j]=q;
-      else{
-        int df=L*L;
-        pij[i][j]=q2p(q,df);
-      }
-      if(q_pij) cout << "(" << i+1 << " " << rs[i] << "," << j+1 << " " << rs[j]
-         << ") interaction p-value: " << pij[i][j] << endl;
-      else cout << "(" << i+1 << " " << rs[i] << "," << j+1 << " " << rs[j]
-         << ") interaction LR-statistic: " << pij[i][j] << endl;
-    }
-  }
-  if(master){
-    ofstream fq2;
-    if(q_qij)
-      fq2.open("gedi.qij",ios::out);
-    else if(q_pij)
-      fq2.open("gedi.pij",ios::out);
-    for(int i=0;i<nsnp;i++){
-      fq2 << left;
-      fq2 << setw(15) << rs[i] << " ";
-      fq2 << right;
-      for(int j=0;j<i;j++)
-        fq2 << setw(11) << pij[j][i] << " ";
-      fq2 << setw(11) << pi[i] << " ";
-      for(int j=i+1;j<nsnp;j++)
-        fq2 << setw(11) << pij[i][j] << " ";
-      fq2 << endl;
-    }
-    fq2.close();
-    if(q_qij) cout << " \n Single locus/interaction LR statistic results written to gedi.qij\n\n";
-    else if(q_pij) cout << " \n Single locus/interaction p-value results written to gedi.pij\n\n";
-  }
-
+  double dev=cl_min(rs,ai[0],yk,lambda,th);
   return dev;
+
 }
 
 // performs cl ridge regression
 double cl_min(const vector<string> &rs,const vector<vector<bool> > &ai,const vector<double> &yk,
-    double lambda,Theta &th,int i0,int j0){
+    double lambda,Theta &th){
 
   int nsnp=ai[0].size()/2;
   int nind=yk.size();

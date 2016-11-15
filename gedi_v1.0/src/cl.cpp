@@ -1478,13 +1478,14 @@ void snp_select(const vector<vector<vector<bool> > > &ai,int nv,
       double alpha0=0;
       double beta0[2]={0,};
       vector<double> h(2*L);
+      double r2=0;
       if(!q_qt)
         nna=assoc(fr1,nmiss,q,alpha0,beta0);
       else{
         if(q_qtpl)
           nna=qt_assoc(ak,ykl,fr1[0],fry,nmiss[0],q,h);
         else
-          nna=qtlr_assoc(ak,ykl,fr1[0],nmiss[0],q,h);
+          nna=qtlr_assoc(ak,ykl,fr1[0],nmiss[0],q,h,r2);
       }
       if(nna){ 
         nscount++;

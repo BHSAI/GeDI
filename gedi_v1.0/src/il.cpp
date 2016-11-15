@@ -233,10 +233,25 @@ void il_bed(string &meta,string &out_file,bool q_lr){
   int nsample=mbfile.size();   // no. of samples
   int ntot=nind[0]+nind[1];
   if(master) cout << "No. of individuals = " << ntot << endl << endl;
-  if(q_qt && q_boot)    // bootstrap
-    for(int s=0;s<nsample;s++)
+  if(q_boot){
+    if(q_qt){
+      for(int s=0;s<nsample;s++)
 //    random_shuffle(yk[s].begin(),yk[s].end(),myrandom);
-      myshuffle(yk[s]);
+        myshuffle(yk[s]);
+    }
+    else{
+      for(int s=0;s<nsample;s++){
+        int nsize=nptr[s+1][0]+nptr[s+1][1]-nptr[s][0]-nptr[s][1];
+        int ncase=nptr[s+1][1]-nptr[s][1];
+        vector<int> n1(ncase);
+        sample(nsize,ncase,n1);
+        for(int k=0;k<nsize;k++)
+          phe[s][k]=0;
+        for(int k=0;k<ncase;k++)
+          phe[s][n1[k]]=1;
+      }
+    }
+  }
 
   int nsnp=a0.size();
 
@@ -280,7 +295,8 @@ void il_bed(string &meta,string &out_file,bool q_lr){
       end();
     }
   }
-
+ 
+  double qsum=0;
   for(int i=0;i<nsnp;i++){  // loop over snps
     double alpha=0;
     double beta[2]={0,};
@@ -292,6 +308,7 @@ void il_bed(string &meta,string &out_file,bool q_lr){
     int nmist[2]={0,};
     double teff=0;
     int nscount=0;
+    double r2s=0;
     for(int s=0;s<nsample;s++){
       int ncase=0;
       if(!q_qt)
@@ -355,6 +372,7 @@ void il_bed(string &meta,string &out_file,bool q_lr){
       double q=0;
       bool nna=true;
       vector<double> h(2*L);
+      double r2=0;
       if(!q_lr){
         if(!q_qt)
           nna=assoc(fr1,nmiss,q,alp,bet);      // GeDI inference 
@@ -362,7 +380,7 @@ void il_bed(string &meta,string &out_file,bool q_lr){
           if(q_qtpl)
             nna=qt_assoc(ak,yk[s],fr1[0],fry,nmiss[0],q,h);
           else
-            nna=qtlr_assoc(ak,yk[s],fr1[0],nmiss[0],q,h);
+            nna=qtlr_assoc(ak,yk[s],fr1[0],nmiss[0],q,h,r2);
         }
       }
       else{                                  // LR inference
@@ -407,8 +425,10 @@ void il_bed(string &meta,string &out_file,bool q_lr){
           beta[1]+=bet[1]*neff;
           nmist[1]+=nmiss[1];
         }
-        else
+        else{
           for(int l=0;l<2*L;l++) hs[l]+=h[l]*neff;
+          r2s+=r2*neff;
+        }
         teff+=neff;
         nscount++;
       }
@@ -420,14 +440,18 @@ void il_bed(string &meta,string &out_file,bool q_lr){
         beta[0]/=teff;
         beta[1]/=teff;
       }
-      else
+      else{
         for(int l=0;l<2*L;l++) hs[l]/=teff;
+        r2s/=teff;
+      }
     }
-    if(master) il_stat(of,nchr[i],rs[i],pos[i],minor,nmist,nnat,qtot,nscount,alpha,beta,hs);
+    if(master) il_stat(of,nchr[i],rs[i],pos[i],minor,nmist,nnat,qtot,nscount,alpha,beta,hs,r2s);
+    qsum+=qtot;
   }  // end of snp loop
 
   if(master){
     cout << nsnp << " snps analyzed\n\n";
+    cout << "Likelihood ratio statistic: " << qsum << endl << endl;
     of.close();
   }
   for(int s=0;s<nsample;s++) f0[s].close();
@@ -582,8 +606,10 @@ void il_tped(string &tped,string &tfam,string &meta_file,string &out_file,bool q
      }
    }
 
+   double qsum=0;
    string line;
    while(getline(f0[0],line)){  // loop over snps (rows)
+     double r2s=0;
      double alpha=0;
      double beta[2]={0,};
      vector<double> hs(2*L);
@@ -649,6 +675,7 @@ void il_tped(string &tped,string &tfam,string &meta_file,string &out_file,bool q
        double q=0;
        bool nna=true;
        vector<double> h(2*L);
+       double r2=0;
        if(!q_lr){
          if(!q_qt)
            nna=assoc(f1,nmiss,q,alp,bet);      // GeDI inference 
@@ -656,7 +683,7 @@ void il_tped(string &tped,string &tfam,string &meta_file,string &out_file,bool q
            if(q_qtpl)
              nna=qt_assoc(ak,yk[s],f1[0],fry,nmiss[0],q,h);
            else
-             nna=qtlr_assoc(ak,yk[s],f1[0],nmiss[0],q,h);
+             nna=qtlr_assoc(ak,yk[s],f1[0],nmiss[0],q,h,r2);
          }
        }
        else{
@@ -701,8 +728,10 @@ void il_tped(string &tped,string &tfam,string &meta_file,string &out_file,bool q
            beta[1]+=bet[1]*neff;
            nmist[1]+=nmiss[1];
          }
-         else
+         else{
            for(int l=0;l<2*L;l++) hs[l]+=h[l]*neff;
+           r2s+=r2*neff;
+         }
          nscount++;
        }
        if(++s==nsample) break;
@@ -715,17 +744,23 @@ void il_tped(string &tped,string &tfam,string &meta_file,string &out_file,bool q
          beta[0]/=teff;
          beta[1]/=teff;
        }
-       else
+       else{
          for(int l=0;l<2*L;l++) hs[l]/=teff;
+         r2s/=teff;
+       }
      }
      if(master){
        if(nsnp>Npr && nsnp%Npr==0) 
          cout << "inferring parameters for " << nsnp << "'th SNP:\n";
      }
      nsnp++;
-     il_stat(of,nchr,rsn[0],pos,minor,nmist,nnat,qtot,nscount,alpha,beta,hs);
+     il_stat(of,nchr,rsn[0],pos,minor,nmist,nnat,qtot,nscount,alpha,beta,hs,r2s);
+     qsum+=qtot;
    }
-   if(master) cout << nsnp << " snps analyzed\n\n";
+   if(master){
+     cout << nsnp << " snps analyzed\n\n";
+     cout << "Likelihood ratio statistic: " << qsum << endl << endl;
+   }
 
    for(int s=0;s<nsample;s++) f0[s].close();
    if(master) of.close();
@@ -752,8 +787,10 @@ void header(ofstream& of,int nind[2]){
        of << setw(11) << "h10" << " ";
        if(model==GEN) of << setw(11) << "h11" << " ";
      }
-     else
+     else{
+       of << setw(11) << left << "R^2" << " ";
        of << setw(11) << left << "beta" << " ";
+     }
    }
    of << setw(11) << "q" << " ";
    if(q_qtpl) of << setw(4) << "df" << " ";
@@ -767,7 +804,7 @@ void header(ofstream& of,int nind[2]){
 }
 
 void il_stat(ofstream& of,int nchr,string &rsn,int pos,char minor,int nmiss[],bool nna,
-     double q,int nsample,double &alpha,double beta[],const vector<double> &hs){
+     double q,int nsample,double &alpha,double beta[],const vector<double> &hs,double r2){
 
      of << setprecision(5);
      of << setw(4) << right << nchr << " ";
@@ -794,6 +831,7 @@ void il_stat(ofstream& of,int nchr,string &rsn,int pos,char minor,int nmiss[],bo
              of << setw(11) << left << hs[2*l+1] << " ";
          }
          else{
+           of << setw(11) << left << r2 << " ";
            of << setw(11) << left << hs[1] << " ";
          }
        }
@@ -1621,6 +1659,26 @@ void il_bpr(string &meta_file,string &out_file,string &par_file,bool q_lr){
   read_bfm(mbfile,meta_file,nind,nptr,phe,a0,a1,nchr,pos,rs,yk);  // read bim fam files
   int nsample=mbfile.size();   // no. of samples
   int nsnp=a0.size();
+  if(q_boot){
+    if(q_qt){
+      for(int s=0;s<nsample;s++)
+//    random_shuffle(yk[s].begin(),yk[s].end(),myrandom);
+        myshuffle(yk[s]);
+    }
+    else{
+      for(int s=0;s<nsample;s++){
+        int nsize=nptr[s+1][0]+nptr[s+1][1]-nptr[s][0]-nptr[s][1];
+        int ncase=nptr[s+1][1]-nptr[s][1];
+        vector<int> n1(ncase);
+        sample(nsize,ncase,n1);
+        for(int k=0;k<nsize;k++)
+          phe[s][k]=0;
+        for(int k=0;k<ncase;k++)
+          phe[s][n1[k]]=1;
+      }
+    }
+  }
+
 
   // read bed files
   ifstream *f0=new ifstream[nsample];

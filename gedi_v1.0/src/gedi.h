@@ -31,7 +31,8 @@ void read_map(std::ifstream &mf,std::vector<int> &chr,std::vector<std::string> &
     std::vector<int> &pos);
 
 void il_stat(std::ofstream &of,int nchr,std::string &rsn,int pos,char minor,int nmiss[],
-    bool nna,double q,int nsample,double &alpha,double beta[],const std::vector<double> &hs);
+    bool nna,double q,int nsample,double &alpha,double beta[],const std::vector<double> &hs,
+    double r2);
 
 void pr(std::ofstream &of,const std::vector<std::vector<std::vector<bool> > > &ai,double alpha,
     const std::vector<double> &beta1,const std::vector<double> &beta2,
@@ -47,7 +48,7 @@ bool assoc(double f1[2][2],int nind[2],double &q,double &alpha,double beta[]);
 
 bool qt_assoc(const std::vector<short> &ak,const std::vector<double> &yk,double f1[2],double fry[2],int &nind,double &q,std::vector<double> &h);
 
-bool qtlr_assoc(const std::vector<short> &ak,const std::vector<double> &yk,double f1[2],int &nind,double &q,std::vector<double> &h);
+bool qtlr_assoc(const std::vector<short> &ak,const std::vector<double> &yk,double f1[2],int &nind,double &q,std::vector<double> &h,double &r2);
 
 int code(int a,Model model);
 
