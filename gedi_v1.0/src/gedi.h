@@ -46,7 +46,7 @@ void pr(std::ofstream &of,const std::vector<std::vector<std::vector<bool> > > &a
 void read_par(std::ifstream &prf,double &alpha,std::vector<double> &beta1, std::vector<double> &beta2,
     std::vector<double> &pf);
 
-void freq(int nmiss[],const std::string &gi0,const std::string &gi1,
+void freq(int ntot,int nmiss[],const std::string &gi0,const std::string &gi1,
     const std::vector<short> &phe,char &minor,char &major,char &rsk,double f1[2][2],int s);
 
 bool assoc(double f1[2][2],int nind[2],double &q,double &alpha,double beta[]);

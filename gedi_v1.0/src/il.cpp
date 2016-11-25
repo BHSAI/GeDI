@@ -320,7 +320,7 @@ void il_bed(string &meta,string &out_file,bool q_lr){
       int nmiss[2]={0,};
       double fr1[2][2]={{0,}};
       double fry[2]={0,};    // y-weighted freq. for qt
-      freq(nmiss,gi0,gi1,phe[s],minor,major,rsk,fr1,s);  // if s==0, minor/major are set; otherwise 
+      freq(ntot,nmiss,gi0,gi1,phe[s],minor,major,rsk,fr1,s);  // if s==0, minor/major are set; otherwise 
                                                          // they are used and not changed
       vector<short> ak;
       if(q_qt){
@@ -612,7 +612,7 @@ void il_tped(string &tped,string &tfam,string &meta_file,string &out_file,bool q
          end();
        }
        int nmiss[2]={0,};
-       freq(nmiss,gi0,gi1,phe[s],minor,major,rsk,f1,s);
+       freq(nsize,nmiss,gi0,gi1,phe[s],minor,major,rsk,f1,s);
        vector<short> ak;
        double fry[2]={0,};
        if(q_qt){
@@ -1013,7 +1013,7 @@ bool assoc(double f1[2][2],int nind[2],double &q,double &alpha,double beta[]){
 }
 
 // calculates genotype frequencies at each locus 
-void freq(int nmiss[],const string &gi0,const string &gi1,const vector<short> &phe,
+void freq(int ntot,int nmiss[],const string &gi0,const string &gi1,const vector<short> &phe,
     char &minor,char &major,char &rsk,double f1[2][2],int s){
 
   char code[4]={'T','C','G','A'};
@@ -1022,7 +1022,7 @@ void freq(int nmiss[],const string &gi0,const string &gi1,const vector<short> &p
 
   nmiss[0]=nmiss[1]=0;
 //int ntot=phe.size();
-  int ntot=gi0.size();
+//int ntot=gi0.size();
   int y=0;
   for(int n=0;n<ntot;n++){
     if(!q_qt) y=phe[n];
@@ -1491,7 +1491,7 @@ void pr_tped(string &tped,string &tfam,string &meta_file,string &par_file,string
          end();
        }
        int nmiss[2]={0,};
-       freq(nmiss,gi0,gi1,phe[s],minor,major,rsk,f1,s);
+       freq(nsize,nmiss,gi0,gi1,phe[s],minor,major,rsk,f1,s);
        int nc[2]={0,};
        for(int n=0;n<int(nsize);n++){
          int y=phe[s][n];
@@ -1787,7 +1787,7 @@ void il_bpr(string &meta_file,string &out_file,string &par_file,bool q_lr){
       }
       int nmiss[2]={0,};
       double fr1[2][2]={{0,}};
-      freq(nmiss,gi0,gi1,phe[s],minor,major,rsk,fr1,s);
+      freq(nsize,nmiss,gi0,gi1,phe[s],minor,major,rsk,fr1,s);
       int nc[2]={0,};
       int y=0;
       for(int n=0;n<int(gi0.size());n++){

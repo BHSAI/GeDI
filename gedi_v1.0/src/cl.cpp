@@ -767,9 +767,10 @@ void bin_read(string &meta,int &nsample,vector<vector<int> > &nptr,
       int nmiss[2]={0,};
       char minor,major,rsk;
       double fr1[2][2]={{0,}};   // frequency fr1[y=0,1][Aa,AA]
-      freq(nmiss,gi0,gi1,phe[s],minor,major,rsk,fr1,s);  // determine minor allele
+      freq(nsize,nmiss,gi0,gi1,phe[s],minor,major,rsk,fr1,s);  // determine minor allele
       vector<vector<bool> > aip(nsize);
       for(int n=0;n<int(nsize);n++){
+        aip[n].resize(2);
         char c0=gi0.at(n);
         char c1=gi1.at(n);
         bool b0=false;
@@ -783,8 +784,8 @@ void bin_read(string &meta,int &nsample,vector<vector<int> > &nptr,
           if(cnt==1) b1=true;
           if(cnt==2) b0=true; 
         }
-        aip[n].push_back(b0);
-        aip[n].push_back(b1);
+        aip[n][0]=b0;
+        aip[n][1]=b1;
       }
       vector<int> index(nsize);
       for(int n=0;n<int(nsize);n++) index[n]=n;
@@ -1021,9 +1022,10 @@ void tped_read(string &tped,string &tfam,string &meta,string &par,int &nsample,
         cerr << " Genotype data in " << mtped[s] << " do not match " << mtfam[s] << endl;
         end();
       }
-      freq(nmiss,gi0,gi1,phe[s],minor,major,rsk,fr1,s);  // determine minor allele
+      freq(ntot,nmiss,gi0,gi1,phe[s],minor,major,rsk,fr1,s);  // determine minor allele
       vector<vector<bool> > aip(ntot);
       for(int n=0;n<int(ntot);n++){
+        aip[n].resize(2);
         char c0=gi0.at(n);
         char c1=gi1.at(n);
         bool b0=false;
@@ -1037,8 +1039,8 @@ void tped_read(string &tped,string &tfam,string &meta,string &par,int &nsample,
           if(cnt==1) b1=true;
           if(cnt==2) b0=true; 
         }
-        aip[n].push_back(b0);
-        aip[n].push_back(b1);
+        aip[n][0]=b0;
+        aip[n][1]=b1;
       }
       vector<int> index(ntot);
       for(int n=0;n<int(ntot);n++) index[n]=n;
