@@ -21,7 +21,7 @@ extern std::vector<std::vector<std::vector<short> > > ai;     // genotype ai[y][
 using namespace std;
 
 extern double tol;              // iteration tolerance
-extern unsigned int imax;                // maximum no. of iterations
+extern unsigned int Imax;                // maximum no. of iterations
 
 // single-locus logistic regression
 bool il_dlr(double &q,double &alpha,double beta[],const vector<vector<short> > &ani){
@@ -73,10 +73,10 @@ bool il_dlr(double &q,double &alpha,double beta[],const vector<vector<short> > &
     status=gsl_multimin_test_gradient(s->gradient,tol);
 //  if(status == GSL_SUCCESS) cout << "Minimum found at:\n";
 //  cout << setw(10) << iter << " " << setw(10) << setprecision(5) << s->f  << endl;
-  }while(status==GSL_CONTINUE && iter< imax);
+  }while(status==GSL_CONTINUE && iter< Imax);
 
   if(status){
-//  cerr << "LR failed to converge after " << imax << " steps\n";
+//  cerr << "LR failed to converge after " << Imax << " steps\n";
 //  exit(1);
     return false;
   }

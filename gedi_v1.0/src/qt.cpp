@@ -26,7 +26,7 @@ using namespace std;
 
 extern Model model;
 extern int L;
-extern unsigned int imax;; // maximum no. of iterations
+extern unsigned int Imax;; // maximum no. of iterations
 extern double tol;       // iteration tolerance
 extern vector<double> lambda;
 extern vector<double> eps;
@@ -50,6 +50,7 @@ extern bool q_pij;       // true if interaction p-value
 extern bool q_qij;       // true if interaction LR statistic
 extern bool q_qtil;      // true if qt-IL
 extern bool q_pout;      // true if p-value output
+extern bool q_covar;     // true if covariates
 extern int ncv;
 extern string excl_file; // snp exclusion list
 extern int nproc;        // no. of processors
@@ -66,6 +67,8 @@ extern int Seed;         // random no. seed
 extern bool q_mfp;        // flag for parallel MF
 const int Nb=32;         // block size for parallel MF (ScaLAPACK)
 #endif
+const int Iter=1000;
+const double Tol=1e-5;
 
 struct Pares{            // bundles of parameters for minimization
   const vector<vector<vector<bool> > > &ai;
@@ -131,14 +134,18 @@ void cl_qt(string &meta){
 //  tped_read(tped,tfam,meta,par,nsample,nptr,ai,rs,exc_list);   // read genotypes
 //else
 
-  bin_read(meta,nsample,nptr,ai,rs,exc_list,yk,false);
+  vector<vector<vector<double> > > covar(nsample);
+  vector<vector<vector<int> > > cov_ds;
+  bin_read(meta,nsample,nptr,ai,rs,exc_list,yk,false,covar,cov_ds);
 
   vector<vector<vector<vector<bool> > > > av(nsample); // not used
   vector<vector<vector<vector<bool> > > > aw(nsample);
   vector<string> ra;
   vector<vector<double> > ykv(nsample);
   vector<vector<double> > ykw(nsample);
-  snp_select(ai,-1,av,aw,rs,ra,nptr,yk,ykv,ykw);
+  vector<vector<vector<double> > > covv(nsample);
+  vector<vector<vector<double> > > covw(nsample);
+  snp_select(ai,-1,av,aw,rs,ra,nptr,yk,ykv,ykw,covar,covv,covw);
   int nsig=ra.size();
   if(master) cout << nsig << " SNPs selected with p < " << pcut << endl << endl;
   if(nsig==0){
@@ -265,13 +272,13 @@ bool qt_assoc(const vector<short> &ak,const vector<double> &yk,double f1[2],doub
 //  if(iter%Npr2==0 || status==GSL_SUCCESS){
 //    if(master) cout << " P(a|y) iteration #" << iter << " LL = " << -s->f << endl;
 //  }
-  }while(status==GSL_CONTINUE && iter <imax);
+  }while(status==GSL_CONTINUE && iter <Imax);
   if(status){
     if(master) cerr << " GSL iteration code " << status << endl;
     end();
   }
-  if(iter==imax){
-    if(master) cerr << "BFGS2 iteration failed to converge after " << imax << " iteration\n";
+  if(iter==Imax){
+    if(master) cerr << "BFGS2 iteration failed to converge after " << Imax << " iteration\n";
     end();
   }
 
@@ -314,42 +321,130 @@ bool qt_assoc(const vector<short> &ak,const vector<double> &yk,double f1[2],doub
 }
 
 // linear regression QT
-bool qtlr_assoc(const vector<short> &ak,const vector<double> &yk,double f1[2],int &nind,double &q,vector<double> &h,double &r2){
+bool qtlr_assoc(const vector<short> &ak,const vector<double> &yk,int &nind,double &q,vector<double> &h,double &r2,const vector<vector<double> > &covar,vector<double> &bcov){
 
-  double xave=0;
-  double yave=0;
-  for(int k=0;k<nind;k++){
-    int a=ak[k];
-    a=code(a,model);
-    xave+=a;
-    double y=yk[k];
-    yave+=y;
+  double beta0,beta1;
+  if(!q_covar){
+    double xave=0;
+    double yave=0;
+    for(int k=0;k<nind;k++){
+      int a=ak[k];
+      a=code(a,model);
+      xave+=a;
+      double y=yk[k];
+      yave+=y;
+    }
+    double s0=0;
+    double s1=0;
+    double y2=0;
+    xave/=nind;
+    yave/=nind;
+    for(int k=0;k<nind;k++){
+      int a=ak[k];
+      a=code(a,model);
+      double y=yk[k];
+      s0+=(y-yave)*(a-xave);
+      s1+=(a-xave)*(a-xave);
+      y2+=y*y;
+    }
+    beta1=s0/s1;                
+    beta0=yave-beta1*xave;        
+    double s2=0;
+    for(int k=0;k<nind;k++){
+      int a=ak[k];
+      a=code(a,model);
+      double df=yk[k]-beta0-beta1*a;
+      s2+=df*df;                // residual
+    }
+    q=beta1*sqrt(s1*(nind-2)/s2);
+    r2=1-s2/(y2-nind*yave*yave);
   }
-  xave/=nind;
-  yave/=nind;
-  double s0=0;
-  double s1=0;
-  double y2=0;
-  for(int k=0;k<nind;k++){
-    int a=ak[k];
-    a=code(a,model);
-    double y=yk[k];
-    s0+=(y-yave)*(a-xave);
-    s1+=(a-xave)*(a-xave);
-    y2+=y*y;
-  }
-  double beta1=s0/s1;
-  double beta0=yave-beta1*xave;
+  else{                         // with covariates
+    int ndim=2;
+    int ncovar=0;
+    ncovar=covar[0].size();
+    ndim+=ncovar;
+    if(nind<=ndim){
+      if(master) cerr << "Too many covariates. Bye!\n";
+      end();
+    }
+    gsl_matrix *A=gsl_matrix_alloc(ndim,nind);  // design matrix=X^t (ndim x nind)
+    gsl_matrix *H=gsl_matrix_alloc(ndim,nind);
+    for(int k=0;k<nind;k++){
+      int a=ak[k];
+      a=code(a,model);
+      gsl_matrix_set(A,0,k,1);       // intercept
+      gsl_matrix_set(A,1,k,a);       // genotype
+      for(int m=0;m<ncovar;m++)
+        gsl_matrix_set(A,m+2,k,covar[k][m]);  // covariates
+    }
+    vector<double> beta(ndim);
 
-  double s2=0;
-  for(int k=0;k<nind;k++){
-    int a=ak[k];
-    a=code(a,model);
-    double df=yk[k]-beta0-beta1*a;
-    s2+=df*df;
+    gsl_matrix *C=gsl_matrix_alloc(ndim,ndim);
+    gsl_matrix *Ci=gsl_matrix_alloc(ndim,ndim);
+    for(int i=0;i<ndim;i++) for(int j=0;j<ndim;j++){
+      double sum=0;
+      for(int k=0;k<nind;k++)
+        sum+=gsl_matrix_get(A,i,k)*gsl_matrix_get(A,j,k);   // C=X^t*X  (correlation)
+      gsl_matrix_set(C,i,j,sum);
+    }
+    int t;
+    gsl_permutation *perm=gsl_permutation_alloc(ndim);
+    gsl_linalg_LU_decomp(C,perm,&t);
+    gsl_linalg_LU_invert(C,perm,Ci);                        // Ci=C^{-1}
+    vector<double> vi(ndim);
+    for(int i=0;i<ndim;i++){
+      for(int n=0;n<nind;n++){
+        double sum=0;
+        for(int j=0;j<ndim;j++)
+          sum+=gsl_matrix_get(Ci,i,j)*gsl_matrix_get(A,j,n);
+        gsl_matrix_set(H,i,n,sum);    // H=Ci*A
+      }
+      vi[i]=gsl_matrix_get(Ci,i,i);
+    }
+    gsl_matrix_free(C);
+    gsl_matrix_free(Ci);
+
+    for(int i=0;i<ndim;i++){
+      double sum=0;
+      for(int n=0;n<nind;n++)
+        sum+=gsl_matrix_get(H,i,n)*yk[n];
+      beta[i]=sum;
+      if(i>=2) bcov.push_back(beta[i]);  // covariate coefficients
+    }
+    beta0=beta[0];
+    beta1=beta[1];
+
+    double s2=0;
+    double y2=0;
+    double yave=0;
+//  double sy=0;
+//  double yhav=0;
+//  double yh2=0;
+    for(int k=0;k<nind;k++){
+      int a=ak[k];
+      a=code(a,model);
+      double yhat=beta0+beta1*a;
+      for(int m=0;m<ncovar;m++)
+        yhat+=beta[m+2]*covar[k][m];
+      double df=yk[k]-yhat;
+      s2+=df*df;                     // residual
+      y2+=yk[k]*yk[k];
+      yave+=yk[k];
+//    sy+=yk[k]*yhat;
+//    yhav+=yhat;
+//    yh2+=yhat*yhat;
+    }
+    yave/=nind;
+//  yhav/=nind;
+    double sig=sqrt(s2/(nind-ndim));      // unbiased std
+    vector<double> zi(ndim);
+    for(int i=0;i<ndim;i++)
+      zi[i]=beta[i]/sig/sqrt(vi[i]);       // z-score
+    r2=1-s2/(y2-nind*yave*yave);
+//  r2=(sy-nind*yave*yhav)*(sy-nind*yave*yhav)/(y2-nind*yave*yave)/(yh2-nind*yhav*yhav);
+    q=zi[1];
   }
-  r2=1-s2/(y2-nind*yave*yave);
-  q=beta1*sqrt(s1*(nind-2)/s2);
 
   h[0]=beta0;
   h[1]=beta1;
@@ -594,14 +689,14 @@ double qt_pl(bool q_null,int i0,const vector<vector<bool> > &ai,const vector<dou
 //  if(iter%Npr2==0 || status==GSL_SUCCESS){
 //    if(master) cout << " P(a|y) iteration #" << iter << " LL = " << -s->f << endl;
 //  }
-  }while(status==GSL_CONTINUE && iter <imax);
+  }while(status==GSL_CONTINUE && iter <Imax);
   if(status){
     if(master) cerr << " GSL iteration code " << status << endl;
     end();
 //  return false;
   }
-  if(iter==imax){
-    if(master) cerr << "BFGS2 iteration failed to converge after " << imax << " iteration\n";
+  if(iter==Imax){
+    if(master) cerr << "BFGS2 iteration failed to converge after " << Imax << " iteration\n";
     end();
 //  return false;
   }
@@ -626,6 +721,245 @@ double qt_pl(bool q_null,int i0,const vector<vector<bool> > &ai,const vector<dou
   gsl_vector_free(x);
 
   return q;
-
 }
 
+// infers covariate coefficients and returns contribution to likelihood ratio statistic
+double qt_covar(bool q_null,const vector<double> &yk,const vector<vector<double> > &covar,
+    const vector<vector<int> > &cov_ds,vector<double> &bcov0,vector<double> &bcov1,vector<double> &cvar,
+    double lambda){
+
+  int nind=yk.size();
+  int ncovar=covar[0].size();
+  double y2av=0;
+  double yav=0;
+  bcov0.resize(ncovar);
+  bcov1.resize(ncovar);
+  cvar.resize(ncovar);
+  for(int m=0;m<ncovar;m++) cvar[m]=1.0;
+  vector<double> cav(ncovar);
+  vector<double> ycav(ncovar);
+  for(int n=0;n<nind;n++){
+    yav+=yk[n];
+    y2av+=yk[n]*yk[n];
+    for(int m=0;m<ncovar;m++){
+      cav[m]+=covar[n][m];
+      ycav[m]+=yk[n]*covar[n][m];
+    }
+  }
+  yav/=nind;
+  y2av/=nind;
+  for(int m=0;m<ncovar;m++){
+    cav[m]/=nind;
+    ycav[m]/=nind;
+  }
+  double var=y2av-yav*yav;      // variance (supposed to be 1 but was scaled by n-1)
+
+  double q=0;
+  int nds=0;                    // no. of discrete covariates
+  for(int m=0;m<ncovar;m++){ 
+    if(cov_ds[m].size()==2){ 
+      vector<short> ak(nind);   // covariates
+      for(int k=0;k<nind;k++)
+        ak[k]=covar[k][m];
+      int cmin=cov_ds[m][0];
+      int cmax=cov_ds[m][1];
+      double h[2]={0,};
+      q+=dcovar(q_null,ak,yk,cmin,cmax,lambda,h);
+      bcov0[m]=h[0];
+      bcov1[m]=h[1];
+      nds++;
+    }
+  }
+  if(nds==ncovar)
+    return q;
+
+  vector<double> bc0p(ncovar);  // for iteration
+  vector<double> bc1p(ncovar);
+  vector<double> cvp(ncovar);
+
+  int iter=0;
+  while(++iter<Iter){
+    double sum=0;
+    for(int m=0;m<ncovar;m++){
+      if(cov_ds[m].size()>0) continue;
+      double varl=var+(1+y2av)*lambda*cvar[m]+lambda*lambda*cvar[m]*cvar[m];
+      if(q_null){
+        bc0p[m]=cav[m]/(1+lambda*cvar[m]);
+        bc1p[m]=0;
+      }
+      else{
+        bc0p[m]=((y2av+lambda*cvar[m])*cav[m]-yav*ycav[m])/varl;
+        bc1p[m]=((1+lambda*cvar[m])*ycav[m]-yav*cav[m])/varl;
+      }
+      cvp[m]=0;
+      for(int n=0;n<nind;n++){
+        double f=covar[n][m]-bcov0[m]-bcov1[m]*yk[n];
+        cvp[m]+=f*f;
+      }
+      cvp[m]/=nind;
+      double df=bc0p[m]-bcov0[m];
+      sum+=df*df;
+      df=bc1p[m]-bcov1[m];
+      sum+=df*df;
+      df=cvp[m]-cvar[m];
+      sum+=df*df;
+    }
+    if(sum<Tol) break;
+    for(int m=0;m<ncovar;m++){
+      if(cov_ds[m].size()>0) continue;
+      bcov0[m]=bc0p[m];
+      bcov1[m]=bc1p[m];
+      cvar[m]=cvp[m];
+    }
+  }
+  if(iter==Iter){
+    if(master) cerr << "QT-DDA covariate did not converge. Bye!\n";
+    end();
+  }
+
+  double dq=0;                       // calculate continuous covar statistics
+  for(int m=0;m<ncovar;m++){
+    if(cov_ds[m].size()>0) continue;
+    for(int n=0;n<nind;n++){
+      double f=covar[n][m]-bcov0[m]-bcov1[m]*yk[n];
+      dq+=f*f/2.0/cvar[m];
+    }
+    dq/=nind;
+    if(cvar[m]<=0){ if(master) cerr << "Error in qt_covar.\n"; end(); }
+    dq+=0.5*(log(cvar[m])+lambda*(bcov0[m]*bcov0[m]+bcov1[m]*bcov1[m]));
+  }
+  q-=dq;
+
+  return q;
+}
+
+struct Parcv{
+  const vector<short> &ak;
+  const vector<double> &yk;
+  int cmin;
+  int cmax;
+  double lambda;
+  bool q_null;
+};
+
+double dcovar(bool q_null,const vector<short> &ak,const vector<double> &yk,int cmin,int cmax,double lambda,double h[2]){
+
+  double cvf(const gsl_vector *v,void *params);
+  void dcvf(const gsl_vector *v,void *params,gsl_vector *df);
+  void cvf_dcvf(const gsl_vector *v,void *params,double *f,gsl_vector *df);
+
+  size_t iter=0;
+  int status;
+  const gsl_multimin_fdfminimizer_type *T;
+  gsl_multimin_fdfminimizer *s;
+  gsl_vector *x;
+  gsl_multimin_function_fdf my_func;
+   
+  Parcv par={ak,yk,cmin,cmax,lambda,q_null};
+  int ndim=2;
+  my_func.n=ndim;
+  my_func.f=cvf;
+  my_func.df=dcvf;
+  my_func.fdf=cvf_dcvf;
+  my_func.params=&par;
+
+  x=gsl_vector_alloc(ndim);
+  gsl_vector_set_zero(x);
+  T=gsl_multimin_fdfminimizer_vector_bfgs2;
+  s=gsl_multimin_fdfminimizer_alloc(T,ndim);
+  gsl_multimin_fdfminimizer_set(s,&my_func,x,0.1,0.1);
+  do{
+    iter++;
+    status=gsl_multimin_fdfminimizer_iterate(s);
+    if(status) break;
+    status=gsl_multimin_test_gradient(s->gradient,tol);
+  }while(status==GSL_CONTINUE && iter<Imax);
+  if(status){
+    if(master) cerr << " GSL iteration code " << status << endl;
+    end();
+  }
+  if(iter==Imax){
+    if(master) cerr << " BFGS2 iteration for DDA discrete covariates failed to converge after"
+                    << Imax << " iterations\n";
+    end();
+  }
+
+  h[0]=gsl_vector_get(s->x,0);
+  h[1]=gsl_vector_get(s->x,1);
+
+  int nind=ak.size();
+  double q=-nind*(s->f);
+  gsl_multimin_fdfminimizer_free(s);
+  gsl_vector_free(x);
+
+  return q;
+}
+
+double cvf(const gsl_vector *v,void *params){
+
+  Parcv *par=(Parcv *)params;
+  double h0=gsl_vector_get(v,0);
+  double h1=gsl_vector_get(v,1);
+
+  double ln=0;
+  int nind=(par->yk).size();
+  for(int k=0;k<nind;k++){
+    int c=(par->ak)[k];
+    double y=(par->yk)[k];
+    ln-=(h0+y*h1)*c;
+    double z=0;
+    for(int cp=(par->cmin);cp<=(par->cmax);cp++)
+      z+=exp((h0+y*h1)*cp);
+    ln+=log(z);
+  }
+  ln/=nind;
+  ln+=0.5*(par->lambda)*(h0*h0+h1*h1);
+
+  return ln;
+}
+
+void dcvf(const gsl_vector *v,void *params,gsl_vector *df){
+
+  double h0=gsl_vector_get(v,0);
+  double h1=gsl_vector_get(v,1);
+  double d0=0;
+  double d1=0;
+
+  Parcv *par=(Parcv *)params;
+  int nind=(par->yk).size();
+
+  for(int k=0;k<nind;k++){
+    double y=(par->yk)[k];
+    int c=(par->ak)[k];
+    double z=0;
+    double cav=0;
+    for(int cp=(par->cmin);cp<=(par->cmax);cp++){
+      double ex=exp((h0+y*h1)*cp);
+      z+=ex;
+      cav+=cp*ex;
+    }
+    cav/=z;
+    d0+=cav-c;
+    d1+=y*(cav-c);
+  }
+  d0/=nind;
+  d1/=nind;
+  d0+=(par->lambda)*h0;
+  d1+=(par->lambda)*h1;
+
+  gsl_vector_set(df,0,d0);
+  if(par->q_null)
+    gsl_vector_set(df,1,0);     // d1 is fixed as 0 under null
+  else
+    gsl_vector_set(df,1,d1);
+}
+
+void cvf_dcvf(const gsl_vector *v,void *params,double *f,gsl_vector *df){
+
+  double cvf(const gsl_vector *v,void *params);
+  void dcvf(const gsl_vector *v,void *params,gsl_vector *df);
+
+  *f=cvf(v,params);
+  dcvf(v,params,df);
+
+}

@@ -24,7 +24,7 @@ using namespace std;
 extern bool master;
 extern Model model;
 extern int L;
-extern unsigned int imax;; // maximum no. of iterations
+extern unsigned int Imax;; // maximum no. of iterations
 extern double tol;      // iteration tolerance
 extern double lambda;
 extern double Lh;       // penalizer for h
@@ -202,10 +202,10 @@ double cl_min(const vector<string> &rs,const vector<vector<vector<bool> > > &ai,
       cout << " Maximum found: ";
     if(status== GSL_SUCCESS || iter%Npr2==0)
       cout << " LR iteration #" << iter << " LL = " << -s->f << endl;
-  }while(status==GSL_CONTINUE && iter< imax);
+  }while(status==GSL_CONTINUE && iter< Imax);
 
-  if(iter==imax){
-    cerr << "BFGS2 iteraction failed to converge after " << imax << "iterations\n";
+  if(iter==Imax){
+    cerr << "BFGS2 iteraction failed to converge after " << Imax << "iterations\n";
     exit(1);
   }
 

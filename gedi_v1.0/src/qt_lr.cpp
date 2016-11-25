@@ -37,6 +37,7 @@ extern bool q_pi;
 extern bool q_pij;
 extern bool q_nsvd;
 extern bool q_qtil;     // true if qt-IL
+extern bool q_covar;    // true if covariates
 
 //extern double alpha;
 //extern vector<double> beta;                      // differences
@@ -52,10 +53,11 @@ extern bool q_qtil;     // true if qt-IL
 void py(const vector<bool> &ai,double &h,double &p,double alpha,const vector<vector<double> > &beta,
     const vector<vector<vector<double> > > &gamm);
 double cl_min(const vector<string> &rs,const vector<vector<bool> > &ai,const vector<double> &yk,
-    double lambda,Theta &th);
+    double lambda,Theta &th,const vector<vector<double> > &cov);
 
-double cl_qtlr(const vector<string> &rs,const vector<vector<vector<bool> > > &ai,const vector<double> &yk,
-    double lambda,Theta &th,bool q_qi){
+double cl_qtlr(const vector<string> &rs,const vector<vector<vector<bool> > > &ai,
+    const vector<double> &yk,double lambda,Theta &th,bool q_qi,
+    const vector<vector<double> > &cov){
 
   if(q_marg){
     if(master) cerr << "Marginal under QT not implemented. Bye!\n";
@@ -63,18 +65,20 @@ double cl_qtlr(const vector<string> &rs,const vector<vector<vector<bool> > > &ai
   }
 
   if(master) cout << "Ridge regression with lambda = " << lambda << "\n\n";
-  double dev=cl_min(rs,ai[0],yk,lambda,th);
+  double dev=cl_min(rs,ai[0],yk,lambda,th,cov);
   return dev;
 
 }
 
 // performs cl ridge regression
 double cl_min(const vector<string> &rs,const vector<vector<bool> > &ai,const vector<double> &yk,
-    double lambda,Theta &th){
+    double lambda,Theta &th,const vector<vector<double> > &cov){
 
   int nsnp=ai[0].size()/2;
   int nind=yk.size();
   double lpr(int nsnp);
+  int ncovar=0;
+  if(q_covar) ncovar=cov[0].size();
 
   th.beta.resize(nsnp);
   th.gamm.resize(nsnp);
@@ -85,8 +89,9 @@ double cl_min(const vector<string> &rs,const vector<vector<bool> > &ai,const vec
     for(int j=0;j<nsnp;j++)
       th.gamm[i][j].resize(L*L);
   }
+  if(q_covar) th.bcov.resize(ncovar);
 
-  int ndim=1+nsnp;
+  int ndim=1+nsnp+ncovar;
   if(!q_qtil)
     ndim+=nsnp*(nsnp-1)/2;        // total dimension
   gsl_matrix *A=gsl_matrix_alloc(ndim,nind);          // design matrix=X^t (ndim x nind)
@@ -105,6 +110,8 @@ double cl_min(const vector<string> &rs,const vector<vector<bool> > &ai,const vec
         gsl_matrix_set(A,idx++,n,ia*jb);
       }
     }
+    for(int m=0;m<ncovar;m++)
+      gsl_matrix_set(A,idx++,n,cov[n][m]);
   }
 
   gsl_matrix *H=gsl_matrix_alloc(ndim,nind); // ndim x nind
@@ -210,6 +217,8 @@ double cl_min(const vector<string> &rs,const vector<vector<bool> > &ai,const vec
         th.gamm[i][j][0]=th.gamm[j][i][0]=beta[idx++];
     }
   }
+  for(int m=0;m<ncovar;m++)
+    th.bcov[m]=beta[idx++];
 
   double var=0;
   for(int n=0;n<nind;n++){
@@ -219,7 +228,6 @@ double cl_min(const vector<string> &rs,const vector<vector<bool> > &ai,const vec
     var+=(yk[n]-sum)*(yk[n]-sum);
   }
   var/=nind;
-
 
   gsl_matrix_free(A);
   gsl_matrix_free(Xt);

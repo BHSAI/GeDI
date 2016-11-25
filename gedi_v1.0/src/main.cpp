@@ -38,6 +38,9 @@ bool q_qtpl=false;         // flag for maximum likelihood IL
 bool q_qtil=false;         // flag for qt-IL
 bool q_covar=false;        // flag for covariates
 bool q_nsvd=false;
+bool q_pr=false;           // flag for prediction
+bool q_lr=false;           // flag for logistic/linear regression
+bool q_Lh=false;           // flag for Lh=LJ
 string excl_file="";       // snp exclusion list file 
 double pcut=-1;            // p-value cutoff for cross-validation
 double tol=1.0e-5;         // iteration tolerance
@@ -45,10 +48,11 @@ vector<double> lambda;     // penalizer
 vector<double> eps;        // MFA regularizer
 double Prev=-1;            // disease prevalence
 double Lh=0;               // penalizer for h
-unsigned int imax=10000;   // maximum no. of iteration
+unsigned int Imax=10000;   // maximum no. of iteration
 string qc_outf="qc.tped";  // quality control mode output genotype file
 string bfile="";           // binary data file prefix
-string cvar_file="";       // covariate file
+string cvar_file="";       // covariate data file
+string cvrout="";          // covariate parameter output
 int ncv=5;                 // order of cross-validation
 int meta=1;                // no. of samples in meta-analysis
 int Npr=10000;             // print freq. for tped SNP numbers
@@ -58,7 +62,8 @@ bool master=true;          // master process
 int Chr=0;                 // chromosome no. (1-based)
 long Start=-1;             // starting position (1-based)
 long End=-1;               // end position (1-based)
-bool q_boot=false;         // flag for boostrapping
+bool q_boot=false;         // flag for phenotype permutation
+bool q_gnul=false;         // flag for genotyppe permutation
 bool q_strict=false;       // flag for being strict
 int Seed=1;                // random no. seed
 float Max_mem=3.0e9;       // maximum memory
@@ -109,8 +114,8 @@ int main(int argc,char* argv[]){
   }
 
    bool q_il=false;          // flag for Independent Loci analysis
-   bool q_lr=false;          // flag for Logistic Regression inference
-   bool q_pr=false;          // flag for prediction
+// bool q_lr=false;          // flag for Logistic Regression inference
+// bool q_pr=false;          // flag for prediction
    bool q_tped=false;        // tped file
    bool q_tfam=false;        // tfam file
    bool q_par=false;         // parameter file
@@ -191,6 +196,8 @@ int main(int argc,char* argv[]){
          q_pout=true;
        else if(flag=="qt")
          q_qt=true;
+       else if(flag=="covar")
+         q_covar=true;
        else if(flag=="qtpl"){
          q_qt=true;
          q_qtpl=true;
@@ -207,7 +214,11 @@ int main(int argc,char* argv[]){
          q_dump=true;
        else if(flag=="boot"){
          q_boot=true;
-         if(master) cout << "Bootstrapping\n";
+         if(master) cout << "Phenotype permutation\n";
+       }
+       else if(flag=="null"){
+         q_gnul=true;
+         if(master) cout << "Genotype permutation\n";
        }
        else{
          if(master){ cerr << "Unknown option: " << flag << endl;
@@ -245,7 +256,7 @@ int main(int argc,char* argv[]){
          tol=atof(argv[i++]);
        else if(flag=="seed")
          Seed=atoi(argv[i++]);
-       else if(flag=="ld"){
+       else if(flag=="ld" || flag=="lhj"){
          string nu;
          lambda.resize(0);
          while(1){
@@ -257,6 +268,7 @@ int main(int argc,char* argv[]){
            lambda.push_back(atof(nu.c_str()));
            if(i==argc) break;
          }
+         if(flag=="lhj") q_Lh=true;
        }
        else if(flag=="eps"){
          string nu;
@@ -274,6 +286,9 @@ int main(int argc,char* argv[]){
        else if(flag=="covar"){ // covariate file
          cvar_file=argv[i++];
          q_covar=true;
+       }
+       else if(flag=="cvrout"){ // covar parameter output
+         cvrout=argv[i++];
        }
        else if(flag=="lh")
          Lh=atof(argv[i++]);
@@ -293,7 +308,7 @@ int main(int argc,char* argv[]){
          }
        }
        else if(flag=="imax")
-         imax=atoi(argv[i++]);
+         Imax=atoi(argv[i++]);
        else if(flag=="cv")
          ncv=atoi(argv[i++]);
        else if(flag=="pcut")
@@ -390,7 +405,7 @@ int main(int argc,char* argv[]){
        if(master){
          cout << "Logistic regression ";
          cout << "(tolerance " << tol;
-         cout << ", max. iteration " << imax << ")\n\n";
+         cout << ", max. iteration " << Imax << ")\n\n";
        }
      }
      if(q_meta || q_metab)
@@ -415,8 +430,8 @@ int main(int argc,char* argv[]){
        }
      }
      else{
-       q_qtil=q_pl=true;
-       cl_tped(tped_file,tfam_file,meta_file,par_file,out_file,q_lr,q_pr,q_qi);
+       q_qtil=true;
+       cl_main(tped_file,tfam_file,meta_file,par_file,out_file,q_lr,q_pr,q_qi);
      }
      if(q_cl){
        if(master) cerr << "IL or CL but not both\n";
@@ -488,7 +503,7 @@ int main(int argc,char* argv[]){
        if(q_ee || q_lr || q_pl){
          if(master){
            cout << "(tolerance " << tol;
-           cout << ", max. iteration " << imax << ")\n\n";
+           cout << ", max. iteration " << Imax << ")\n\n";
          }
        }
        if(q_qi){
@@ -508,16 +523,16 @@ int main(int argc,char* argv[]){
        }
      }
      if(q_tped || q_meta || q_metab || bfile!="")
-       cl_tped(tped_file,tfam_file,meta_file,par_file,out_file,q_lr,q_pr,q_qi);
+       cl_main(tped_file,tfam_file,meta_file,par_file,out_file,q_lr,q_pr,q_qi);
      else{
        if(master) cerr << "tped/tfam files must be specified for CL. Bye!\n";
        end();
      }
    }
-   else if(q_qt){   // qt IL
+   else if(q_qt && q_pl){   // qt IL
      if(q_tped || q_meta || q_metab || bfile!=""){
-       q_qtil=q_pl=true;
-       cl_tped(tped_file,tfam_file,meta_file,par_file,out_file,q_lr,q_pr,q_qi);
+       q_qtil=true;
+       cl_main(tped_file,tfam_file,meta_file,par_file,out_file,q_lr,q_pr,q_qi);
      }
      else{
        if(master) cerr << "Input files not specified. Bye!\n";
