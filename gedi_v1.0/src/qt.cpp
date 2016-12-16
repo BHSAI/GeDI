@@ -66,6 +66,7 @@ extern int Seed;         // random no. seed
 #ifdef MPIP
 extern bool q_mfp;        // flag for parallel MF
 const int Nb=32;         // block size for parallel MF (ScaLAPACK)
+extern int rank;
 #endif
 const int Iter=1000;
 const double Tol=1e-5;
@@ -650,7 +651,7 @@ void qpl_dqpl(const gsl_vector *x,void *params,double *f,gsl_vector *df){
 // PL inference for QT
 double qt_pl(bool q_null,int i0,const vector<vector<bool> > &ai,const vector<double> &yk,
     const vector<vector<vector<double> > > &f1,const vector<vector<vector<vector<float> > > > &f2,
-    double lambda,vector<vector<vector<double> > > &h,vector<vector<vector<vector<float> > > > &J){
+    double lambda,vector<vector<vector<double> > > &h,vector<vector<vector<vector<float> > > > &J,bool &q_crash){
 
   size_t iter=0;
   int status;
@@ -680,6 +681,7 @@ double qt_pl(bool q_null,int i0,const vector<vector<bool> > &ai,const vector<dou
   gsl_vector_set_zero(x);
 
   gsl_multimin_fdfminimizer_set(s,&my_func,x,0.1,0.1);
+  double f0=0;
   do{
     iter++;
     status=gsl_multimin_fdfminimizer_iterate(s);
@@ -689,15 +691,24 @@ double qt_pl(bool q_null,int i0,const vector<vector<bool> > &ai,const vector<dou
 //  if(iter%Npr2==0 || status==GSL_SUCCESS){
 //    if(master) cout << " P(a|y) iteration #" << iter << " LL = " << -s->f << endl;
 //  }
+
+    if(iter>1 && -s->f==f0){  // doesn't improve
+      status=27;
+      break;
+    }
+    f0=-s->f;
   }while(status==GSL_CONTINUE && iter <Imax);
   if(status){
-    if(master) cerr << " GSL iteration code " << status << endl;
-    end();
+    cerr << " GSL iteration code " << status << endl;
+//  end();
 //  return false;
+    q_crash=true;
+//  return 0;
   }
   if(iter==Imax){
-    if(master) cerr << "BFGS2 iteration failed to converge after " << Imax << " iteration\n";
-    end();
+    cerr << "BFGS2 iteration failed to converge after " << Imax << " iteration\n";
+    q_crash=true;
+//  end();
 //  return false;
   }
 

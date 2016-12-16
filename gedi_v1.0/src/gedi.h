@@ -93,7 +93,8 @@ double cl_gdi(const std::vector<std::vector<std::vector<std::vector<bool> > > > 
     const std::vector<std::vector<double > > &yk,bool q_qi,const std::vector<std::string> &rs,
     double lambda,const std::vector<std::vector<int> > &nptr,Theta &th,Theta_qt &th_qt,
     const std::vector<std::vector<std::vector<double> > > &covv,
-    const std::vector<std::vector<std::vector<int> > > &cov_ds);
+    const std::vector<std::vector<std::vector<int> > > &cov_ds,
+    bool &q_crash);
 
 double cl_dlr(const std::vector<std::string> &rs,
     const std::vector<std::vector<std::vector<bool> > > &ai,double lambda,Theta &th,bool q_qi);
@@ -189,7 +190,7 @@ int c2i(char a);
 void read_bfm(std::vector<std::string> &mbfile,const std::string& meta,int nind[2],std::vector<std::vector<int> > &nptr, std::vector<std::vector<short> > &phe,std::vector<char> &a0,std::vector<char> &a1,std::vector<int> &nchr,std::vector<long> &pos,std::vector<std::string> &rs,std::vector<std::vector<double> > &yk);   
 
 double qt_pl(bool q_null,int i0,const std::vector<std::vector<bool> > &ai,const std::vector<double> &yk,
-    const std::vector<std::vector<std::vector<double> > > &f1,const std::vector<std::vector<std::vector<std::vector<float> > > > &f2,double lambda,std::vector<std::vector<std::vector<double> > > &h,std::vector<std::vector<std::vector<std::vector<float> > > > &J);
+    const std::vector<std::vector<std::vector<double> > > &f1,const std::vector<std::vector<std::vector<std::vector<float> > > > &f2,double lambda,std::vector<std::vector<std::vector<double> > > &h,std::vector<std::vector<std::vector<std::vector<float> > > > &J,bool &q_crash);
 
 double qt_covar(bool q_null,const std::vector<double> &yk,const std::vector<std::vector<double> > &covar,
     const std::vector<std::vector<int> > &cov_ds,

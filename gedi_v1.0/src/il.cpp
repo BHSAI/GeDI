@@ -42,7 +42,7 @@ extern string qc_outf;            // output tped file for quality control mode
 extern string bfile;              // binary file prefix
 const double Tolq=1.0e-7;
 extern int Npr;
-extern int master;
+extern bool master;
 
 void infer_par(int nv,const vector<vector<vector<bool> > > &ai,double &alpha,
       vector<double> &beta1,vector<double> &beta2,vector<double> &pv);
@@ -341,7 +341,7 @@ void il_bed(string &meta,string &out_file,bool q_lr){
       vector<double> h(2*L);
       vector<double> bcov;   // covariate coefficients
       double r2=0;
-      if(!q_lr){
+      if(!q_lr || q_qt){
         if(!q_qt)
           nna=assoc(fr1,nmiss,q,alp,bet);      // GeDI inference 
         else{

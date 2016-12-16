@@ -48,7 +48,7 @@ vector<double> lambda;     // penalizer
 vector<double> eps;        // MFA regularizer
 double Prev=-1;            // disease prevalence
 double Lh=0;               // penalizer for h
-unsigned int Imax=10000;   // maximum no. of iteration
+unsigned int Imax=1000;    // maximum no. of iteration
 string qc_outf="qc.tped";  // quality control mode output genotype file
 string bfile="";           // binary data file prefix
 string cvar_file="";       // covariate data file
@@ -403,9 +403,13 @@ int main(int argc,char* argv[]){
      }
      if(q_lr){
        if(master){
-         cout << "Logistic regression ";
-         cout << "(tolerance " << tol;
-         cout << ", max. iteration " << Imax << ")\n\n";
+         if(!q_qt){
+           cout << "Logistic regression ";
+           cout << "(tolerance " << tol;
+           cout << ", max. iteration " << Imax << ")\n\n";
+         }
+         else 
+           cout << "Linear regression ";
        }
      }
      if(q_meta || q_metab)

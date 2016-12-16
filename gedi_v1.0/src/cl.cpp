@@ -128,6 +128,9 @@ extern "C"{
 };
 #endif
 
+const gsl_rng_type *T;   // random number 
+gsl_rng *r;
+
 // reads cl parameters
 
 void read_par_cl(const vector<vector<vector<bool> > > &ai,const string &par,
@@ -467,6 +470,13 @@ void cl_main(string &tped,string &tfam,string &meta,string &par,string &out_file
   vector<vector<vector<double> > > covar;
   vector<vector<vector<int> > > cov_ds;
 
+  if(q_boot || q_gnul){
+    gsl_rng_env_setup();
+    T=gsl_rng_default;
+    r=gsl_rng_alloc(T);
+    gsl_rng_set(r,Seed);
+  }
+
   if(excl_file.size()>0){
     ifstream exc;
     exc.open(excl_file.c_str(),ios::in);
@@ -492,16 +502,19 @@ void cl_main(string &tped,string &tfam,string &meta,string &par,string &out_file
     bin_read(meta,nsample,nptr,ai,rs,exc_list,yk,q_lr,covar,cov_ds);
 
   cl_inf(ai,nptr,yk,out_file,par,q_lr,q_pr,q_qi,nsample,rs,covar,cov_ds);     // CL inference
+
+  if(q_boot || q_gnul)
+    gsl_rng_free(r);
 }
 
 int myrandom(int i){
 
-  const gsl_rng_type *T;
-  gsl_rng *r;
-  gsl_rng_env_setup();
-  T=gsl_rng_default;
-  r=gsl_rng_alloc(T);
-  gsl_rng_set(r,Seed);
+//const gsl_rng_type *T;
+//gsl_rng *r;
+//gsl_rng_env_setup();
+//T=gsl_rng_default;
+//r=gsl_rng_alloc(T);
+//gsl_rng_set(r,Seed);
 
   double u=gsl_rng_uniform(r);
   return int(u*i);
@@ -1084,12 +1097,12 @@ void tped_read(string &tped,string &tfam,string &meta,string &par,int &nsample,
 // samples n integers from 0,...,N-1 without replacement and returns the list as n1
 void sample(int N,int n,vector<int> &n1){
 
-  const gsl_rng_type *T;
-  gsl_rng *r;
-  gsl_rng_env_setup();
-  T=gsl_rng_default;
-  r=gsl_rng_alloc(T);
-  gsl_rng_set(r,Seed);
+//const gsl_rng_type *T;
+//gsl_rng *r;
+//gsl_rng_env_setup();
+//T=gsl_rng_default;
+//r=gsl_rng_alloc(T);
+//gsl_rng_set(r,Seed);
 
   if(n>N){
     if(master) cerr << "Error in phenotype permutation\n";
@@ -1152,6 +1165,7 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
     }
     else{
       for(unsigned int k=0;k<para.size();k++){
+        bool q_crash=false;
         risk.resize(0);
         double s=0;
         double lnp=0;
@@ -1186,8 +1200,13 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
             end();
           }
           double dev=0;
-          if(!q_lr)
-            dev=cl_gdi(av,ykv,q_qi,ra,para[k],nptr,th,th_qt,covv,cov_ds);
+          if(!q_lr){
+            dev=cl_gdi(av,ykv,q_qi,ra,para[k],nptr,th,th_qt,covv,cov_ds,q_crash);
+            if(q_crash){
+              if(master) cerr << "GSL convergence failure \n";
+              break;
+            }
+          }
           else
             for(int s=0;s<nsample;s++){
               if(nsample>1) if(master) cout <<"Sample #" << s+1 << ": \n";
@@ -1197,7 +1216,7 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
                 dev+=cl_qtlr(ra,av[s],ykv[s],para[k],th,q_qi,covv[s]);
             }
           if(master){
-            if(!(q_qt && q_lr))
+//          if(!(q_qt && q_lr))
               cout << "Collective likelihood ratio statistic: " << dev << endl;
           }
           if(q_pout){
@@ -1218,6 +1237,7 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
           else
             pr_cl(of,aw,th,risk);
         }
+        if(q_crash) continue;
         s/=ncv;
         if(master) cout << "Mean SNP number: " << s << endl;
         lnp/=ncv;
@@ -1265,8 +1285,9 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
 //  if(q_qt && q_lr) Lh=para[k];
     if(q_qt || q_Lh) Lh=para[k];
 //  if(q_ee || q_mf || q_pl)
+    bool q_crash=false;
     if(!q_lr)
-      dev=cl_gdi(aw,yk,q_qi,ra,para[k],nptr,th,th_qt,covar,cov_ds);  // GDI
+      dev=cl_gdi(aw,yk,q_qi,ra,para[k],nptr,th,th_qt,covar,cov_ds,q_crash);  // GDI
     else
       for(int s=0;s<nsample;s++){
         if(!q_qt)
@@ -1281,7 +1302,7 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
       else
         pr_cl_qtlr(dummy,aw,ykw,th,risk,covar);
     }
-    roc(ocv,risk);
+    if(q_qt) roc(ocv,risk);
   }
   if(master) of.close();
 }
@@ -1607,11 +1628,12 @@ void snp_select(const vector<vector<vector<bool> > > &ai,int nv,
 double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,const vector<vector<double> > &yk,
     bool q_qi,const vector<string> &rs,double lambda,const vector<vector<int> > &nptr,Theta &th,
     Theta_qt &th_qt,const vector<vector<vector<double> > > &covar,
-    const vector<vector<vector<int> > > &cov_ds){
+    const vector<vector<vector<int> > > &cov_ds,bool &q_crash){
 
   double qtot=0;
   double z[3]={0,};
   double lkl=0;
+  q_crash=false;
 
   int nsnp=ai[0][0][0].size()/2;
   int nsample=nptr.size()-1;   // no. of samples
@@ -1715,7 +1737,8 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,const vector<vec
     else{                           // pseudo-L
 
 #ifdef MPIP
-      int ndata=3*isnp*(L+(nsnp-1)*L*L)+4;
+//    int ndata=3*isnp*(L+(nsnp-1)*L*L)+4;
+      int ndata=3*isnp*(L+(nsnp-1)*L*L)+5;    // extra one for q_crash
       double *data=new double[ndata];         // package for each proc
       double *data0=new double[ndata*nproc];  // received data for master
       for(int i=0;i<ndata;i++) data[i]=0;
@@ -1757,13 +1780,18 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,const vector<vec
           q=2*(lki-lpr_psl(i,2,ai[s],f1[si][2],f2[si][2],lambda,h[si][2][i],J[si][2][i],-1,-1,s));
         }
         else{  // qt
-          lki=qt_pl(false,i,ai[s][0],yk[s],f1[si],f2[si],lambda,h[si],J[si]);
-          lki-=qt_pl(true,i,ai[s][0],yk[s],f1[si],f2[si],lambda,h[si],J[si]);
+          bool q_c=false;
+          lki=qt_pl(false,i,ai[s][0],yk[s],f1[si],f2[si],lambda,h[si],J[si],q_c);
+          q_crash=q_crash || q_c;
+          lki-=qt_pl(true,i,ai[s][0],yk[s],f1[si],f2[si],lambda,h[si],J[si],q_c);
+          q_crash=q_crash || q_c;
+          if(q_crash) break;
           q=2*lki;
         }
         lks+=lki;
         qtos+=q;
         if((i+1)%Npr2==0) cout << "Inference for SNP #" << i+1 << "...\n";
+//      if(q_crash) cout << "Inference for SNP #" << i+1 << " failed\n";
       }
 #ifdef MPIP
       int idata=0;   // pack data
@@ -1777,6 +1805,7 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,const vector<vec
         data[idata++]=lns[1];
         data[idata++]=lks;
         data[idata++]=qtos;
+        data[idata++]=q_crash;
       }
       MPI_Allgather(data,ndata,MPI_DOUBLE,data0,ndata,MPI_DOUBLE,MPI_COMM_WORLD);
 
@@ -1795,7 +1824,9 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,const vector<vec
         lnz[1]+=data0[idata++];
         lkl+=data0[idata++];
         qtot+=data0[idata++];
+        q_crash=q_crash || data0[idata++];
       }
+//    if(master) cout << "q_crash=" << q_crash << endl;
       delete[] data;
       delete[] data0;
 #else
@@ -2967,12 +2998,12 @@ double invC(int nind,const vector<vector<double> > &f1,const vector<vector<vecto
 
 void myshuffle(vector<double> &yk){
 
-  const gsl_rng_type *T;
-  gsl_rng *r;
-  gsl_rng_env_setup();
-  T=gsl_rng_default;
-  r=gsl_rng_alloc(T);
-  gsl_rng_set(r,Seed);
+//const gsl_rng_type *T;
+//gsl_rng *r;
+//gsl_rng_env_setup();
+//T=gsl_rng_default;
+//r=gsl_rng_alloc(T);
+//gsl_rng_set(r,Seed);
 
   int n=yk.size();
   for(int i=n-1;i>0;i--){
@@ -2985,12 +3016,12 @@ void myshuffle(vector<double> &yk){
 
 void ishuffle(vector<int> &indx){
 
-  const gsl_rng_type *T;
-  gsl_rng *r;
-  gsl_rng_env_setup();
-  T=gsl_rng_default;
-  r=gsl_rng_alloc(T);
-  gsl_rng_set(r,Seed);
+//const gsl_rng_type *T;
+//gsl_rng *r;
+//gsl_rng_env_setup();
+//T=gsl_rng_default;
+//r=gsl_rng_alloc(T);
+//gsl_rng_set(r,Seed);
 
   int n=indx.size();
   for(int i=n-1;i>0;i--){

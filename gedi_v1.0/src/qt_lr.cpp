@@ -38,6 +38,10 @@ extern bool q_pij;
 extern bool q_nsvd;
 extern bool q_qtil;     // true if qt-IL
 extern bool q_covar;    // true if covariates
+extern bool q_lrp;      // true if parallel ridge
+const int Nb=32;        // block size for pararell ridge (ScaLAPACK)
+extern int nproc;       // no. of processors
+extern int rank;        // processor id
 
 //extern double alpha;
 //extern vector<double> beta;                      // differences
@@ -49,6 +53,12 @@ extern bool q_covar;    // true if covariates
 //  int i0;
 //  int j0;
 //};
+
+#ifdef MPIP
+extern "C"{
+  void invrs_(float *mat,int *N,int *Nb,int *nproc,int *rank);
+};
+#endif
 
 void py(const vector<bool> &ai,double &h,double &p,double alpha,const vector<vector<double> > &beta,
     const vector<vector<vector<double> > > &gamm);
@@ -152,9 +162,22 @@ double cl_min(const vector<string> &rs,const vector<vector<bool> > &ai,const vec
     gsl_linalg_SV_decomp(A,U,s,work);           // A=V*S*U^t (V is in A now)
 
     gsl_matrix *R=gsl_matrix_alloc(nind,nind);  // R=U*S
-    gsl_matrix *M=gsl_matrix_alloc(nind,nind);  
-    gsl_matrix *Mi=gsl_matrix_alloc(nind,nind);  
     gsl_matrix *Mr=gsl_matrix_alloc(nind,nind);  
+    gsl_matrix *M;
+    gsl_matrix *Mi;
+    gsl_permutation *perm;
+#ifdef MPIP
+    float *mat;
+    if(q_lrp)
+      mat=new float[nind*nind];
+    else{
+#endif
+      M=gsl_matrix_alloc(nind,nind);  
+      Mi=gsl_matrix_alloc(nind,nind);  
+      perm=gsl_permutation_alloc(nind);
+#ifdef MPIP
+    }
+#endif
 
     for(int n=0;n<nind;n++) for(int m=0;m<nind;m++){
       double r=gsl_matrix_get(U,n,m)*gsl_vector_get(s,m);   // R=U*S
@@ -167,20 +190,53 @@ double cl_min(const vector<string> &rs,const vector<vector<bool> > &ai,const vec
         sum+=gsl_matrix_get(R,k,n)*gsl_matrix_get(R,k,m);   // M=(R^t*R+lambda*I)
       if(n==m)
         sum+=lambda;
-      gsl_matrix_set(M,n,m,sum);
+#ifdef MPIP
+      if(q_lrp)
+        mat[n*nind+m]=sum;
+      else
+#endif
+        gsl_matrix_set(M,n,m,sum);
     }
 
-    int t;
-    gsl_permutation *perm=gsl_permutation_alloc(nind);
-    gsl_linalg_LU_decomp(M,perm,&t);
-    gsl_linalg_LU_invert(M,perm,Mi);
+#ifdef MPIP
+    if(q_lrp){
+      int nb=Nb;
+      invrs_(mat,&nind,&nb,&nproc,&rank);   // Mi -> M^{-1} via scaLAPACK
+    }
+    else{
+#endif
+      int t;
+      gsl_linalg_LU_decomp(M,perm,&t);
+      gsl_linalg_LU_invert(M,perm,Mi);
+#ifdef MPIP
+    }
+#endif
 
     for(int n=0;n<nind;n++) for(int m=0;m<nind;m++){
       double sum=0;
-      for(int k=0;k<nind;k++)
-        sum+=gsl_matrix_get(Mi,n,k)*gsl_matrix_get(R,m,k);  // Mr=Mi*R^t
+      for(int k=0;k<nind;k++){
+        double x=0;
+#ifdef MPIP
+        if(q_lrp)
+          x=mat[n*nind+k];
+        else
+#endif
+          x=gsl_matrix_get(Mi,n,k);
+        sum+=x*gsl_matrix_get(R,m,k);  // Mr=Mi*R^t
+      }
       gsl_matrix_set(Mr,n,m,sum);
     }
+#ifdef MPIP
+    if(q_lrp)
+      delete[] mat;
+    else{
+#endif
+      gsl_matrix_free(M);
+      gsl_matrix_free(Mi);
+      gsl_permutation_free(perm);
+#ifdef MPIP
+    }
+#endif
     for(int i=0;i<ndim;i++) for(int n=0;n<nind;n++){
       double sum=0;
       for(int m=0;m<nind;m++)
@@ -191,10 +247,7 @@ double cl_min(const vector<string> &rs,const vector<vector<bool> > &ai,const vec
     gsl_vector_free(s);
     gsl_vector_free(work);
     gsl_matrix_free(R);
-    gsl_matrix_free(M);
-    gsl_matrix_free(Mi);
     gsl_matrix_free(Mr);
-    gsl_permutation_free(perm);
   }
   
   vector<double> beta(ndim);
