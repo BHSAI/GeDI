@@ -129,30 +129,72 @@ double cl_min(const vector<string> &rs,const vector<vector<bool> > &ai,const vec
   gsl_matrix_memcpy(Xt,A);                   // hold onto design matrix
 
   if(nind>=ndim || q_nsvd){             // low dimension (invert correlation)
-    gsl_matrix *C=gsl_matrix_alloc(ndim,ndim);
-    gsl_matrix *Ci=gsl_matrix_alloc(ndim,ndim);
+    gsl_matrix *C;
+    gsl_matrix *Ci;
+    gsl_permutation *perm;
+#ifdef MPIP
+    float *mat;
+    if(q_lrp)
+      mat=new float[ndim*ndim];
+    else{
+#endif
+      C=gsl_matrix_alloc(ndim,ndim);  
+      Ci=gsl_matrix_alloc(ndim,ndim);  
+      perm=gsl_permutation_alloc(ndim);
+#ifdef MPIP
+    }
+#endif
     for(int i=0;i<ndim;i++) for(int j=0;j<ndim;j++){
       double sum=0;
       for(int k=0;k<nind;k++)
         sum+=gsl_matrix_get(A,i,k)*gsl_matrix_get(A,j,k);
       if(i==j)
         sum+=lambda;
-      gsl_matrix_set(C,i,j,sum);
+#ifdef MPIP
+      if(q_lrp)
+        mat[i*ndim+j]=sum;
+      else
+#endif
+        gsl_matrix_set(C,i,j,sum);
     }
-
-    int t;
-    gsl_permutation *perm=gsl_permutation_alloc(ndim);
-    gsl_linalg_LU_decomp(C,perm,&t);
-    gsl_linalg_LU_invert(C,perm,Ci);
-
+#ifdef MPIP
+    if(q_lrp){
+      int nb=Nb;
+      invrs_(mat,&ndim,&nb,&nproc,&rank);   // Mi -> M^{-1} via scaLAPACK
+    }
+    else{
+#endif
+      int t;
+      gsl_linalg_LU_decomp(C,perm,&t);
+      gsl_linalg_LU_invert(C,perm,Ci);
+#ifdef MPIP
+    }
+#endif
     for(int i=0;i<ndim;i++) for(int n=0;n<nind;n++){
       double sum=0;
-      for(int j=0;j<ndim;j++)
-        sum+=gsl_matrix_get(Ci,i,j)*gsl_matrix_get(A,j,n);
+      for(int j=0;j<ndim;j++){
+        double x=0; 
+#ifdef MPIP
+        if(q_lrp)
+          x=mat[i*ndim+j];
+        else
+#endif
+          x=gsl_matrix_get(Ci,i,j);
+        sum+=x*gsl_matrix_get(A,j,n);
+      }
       gsl_matrix_set(H,i,n,sum);          // H=Ci*A
     }
-    gsl_matrix_free(C);
-    gsl_matrix_free(Ci);
+#ifdef MPIP
+    if(q_lrp)
+      delete[] mat;
+    else{
+#endif
+      gsl_matrix_free(C);
+      gsl_matrix_free(Ci);
+      gsl_permutation_free(perm);
+#ifdef MPIP
+    }
+#endif
   }
   else{                                   // high dimension (use SVD)
     gsl_matrix *U=gsl_matrix_alloc(nind,nind);

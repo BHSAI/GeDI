@@ -34,6 +34,7 @@ bool q_pij=false;          // flag for interaction p-values
 bool q_dump=false;         // flag for writing SNP selection lists during IL-cv
 bool q_pout=false;         // flag for asymptotic p-value output
 bool q_qt=false;           // flag for quantitative trait
+bool q_lrp=false;          // flag for parallel ridge regression
 bool q_qtpl=false;         // flag for maximum likelihood IL
 bool q_qtil=false;         // flag for qt-IL
 bool q_covar=false;        // flag for covariates
@@ -196,6 +197,10 @@ int main(int argc,char* argv[]){
          q_pout=true;
        else if(flag=="qt")
          q_qt=true;
+       else if(flag=="lrp"){
+         q_lr=true;
+         q_lrp=true;
+       }
        else if(flag=="covar")
          q_covar=true;
        else if(flag=="qtpl"){
@@ -496,8 +501,12 @@ int main(int argc,char* argv[]){
          if(master) {
            if(!q_qt)
              cout << "Logistic regression\n\n";
-           else
-             cout << "Ridge regression\n\n";
+           else{
+             if(!q_lrp)
+               cout << "Ridge regression\n\n";
+             else
+               cout << "Ridge regression (parallel)\n\n";
+           }
          }
        }
        else{           // PSL
