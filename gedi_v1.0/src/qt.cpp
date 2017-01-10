@@ -741,9 +741,13 @@ double qt_pl(bool q_null,int i0,const vector<vector<bool> > &ai,const vector<dou
 }
 
 // infers covariate coefficients and returns contribution to likelihood ratio statistic
-double qt_covar(bool q_null,const vector<double> &yk,const vector<vector<double> > &covar,
-    const vector<vector<int> > &cov_ds,vector<double> &bcov0,vector<double> &bcov1,vector<double> &cvar,
+double qt_covar(bool q_null,const vector<double> &yk,const vector<vector<double> > &covar0,
+    const vector<vector<int> > &cov_ds0,vector<double> &bcov0,vector<double> &bcov1,vector<double> &cvar,
     double lambda){
+
+  vector<vector<double> > covar=covar0;
+  vector<vector<int> > cov_ds=cov_ds0;
+  chk_covar(covar,cov_ds);               // remove singular part of covar
 
   int nind=yk.size();
   int ncovar=covar[0].size();

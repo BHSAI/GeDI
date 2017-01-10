@@ -434,7 +434,7 @@ int main(int argc,char* argv[]){
            else
              pr_tped(tped_file,tfam_file,meta_file,par_file,out_file);
          }
-         return 0;
+         end();
        }
        else{
          if(master) cerr << "Please specify tped/tfam (or binary) file. Bye!\n";
@@ -540,7 +540,7 @@ int main(int argc,char* argv[]){
      }
      if(q_tped || q_meta || q_metab || bfile!=""){
        cl_main(tped_file,tfam_file,meta_file,par_file,out_file,q_lr,q_pr,q_qi);
-       return 0;
+       end();
      }
      else{
        if(master) cerr << "tped/tfam files must be specified for CL. Bye!\n";
@@ -554,7 +554,7 @@ int main(int argc,char* argv[]){
 //     if(!q_ld)
 //       lambda[0]=0;
        cl_main(tped_file,tfam_file,meta_file,par_file,out_file,q_lr,q_pr,q_qi);
-       return 0;
+       end();
      }
      else{
        if(master) cerr << "Input files not specified. Bye!\n";
