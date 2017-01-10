@@ -60,7 +60,7 @@ void read_pheno(const std::vector<std::string> &mtfam,std::vector<std::vector<in
 void header(std::ofstream &of,int nind[2]);
 
 bool qtlr_assoc(const std::vector<short> &ak,const std::vector<double> &yk,int &nind,double &q,std::vector<double> &h,double &r2,const std::vector<std::vector<double> > &covar,
-    std::vector<double> &bcov);
+  const std::vector<std::vector<int> > &cov_dsl,std::vector<double> &bcov);
 
 int code(int a,Model model);
 
@@ -76,6 +76,7 @@ void snp_select(const std::vector<std::vector<std::vector<bool> > > &ai,int nv,
     const std::vector<std::vector<int> > &nptr,const std::vector<std::vector<double> > &yk,
     std::vector<std::vector<double> > &ykv,std::vector<std::vector<double> > &ykw,
     const std::vector<std::vector<std::vector<double> > > &covar,
+    const std::vector<std::vector<std::vector<int> > > &covar_dS,
     std::vector<std::vector<std::vector<double> > > &covv,
     std::vector<std::vector<std::vector<double> > > &covw);
 
@@ -200,5 +201,7 @@ void read_cov(const std::string &file,const std::vector<std::string> &fid,const 
 
 double dcovar(bool q_null,const std::vector<short> &ak,const std::vector<double> &yk,int cmin,int cmax,double lambda,
     double h[2]);
+
+void chk_covar(std::vector<std::vector<double> > &covar,std::vector<std::vector<int> > &covar2);
 
 #endif

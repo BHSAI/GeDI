@@ -69,6 +69,7 @@ extern bool q_qt;        // true if quantitative trait
 extern bool q_qtil;      // true if quantitative trait IL
 extern bool q_qtpl;      // true if using PL for IL in CL (!)
 extern bool q_covar;     // true if covariates
+extern bool q_dump;      // true if dumping snp lists in CV
 extern int Seed;         // random no. seed
 extern string cvar_file; // covariate file
 extern string cvrout;    // covariate parameter output
@@ -77,6 +78,7 @@ extern bool q_mfp;       // flag for parallel MF
 const int Nb=32;         // block size for parallel MF (ScaLAPACK)
 #endif
 const double Dy=0.1;    // integration grid size for trapezoidal rule
+const double Tol=1e-10;  // tolerance for covariate check
 
 struct Pares{            // bundles of parameters for minimization
   const vector<vector<vector<bool> > > &ai;
@@ -1147,6 +1149,8 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
 
   bool comp(vector<double> a,vector<double> b);
   void roc(ofstream &ocv,vector<vector<double> > &risk);
+//vector<vector<vector<double> > >  covar2;
+//vector<vector<vector<int> > >  cov_ds2;
   if(q_pr){         // prediction mode
     if(master) ocv.open("gedi.auc",ios::out);
     if(!q_cv){
@@ -1190,11 +1194,20 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
           vector<vector<double> > ykw(nsample);   // qt-phenotype for test set
           vector<vector<vector<double> > > covv(nsample); // covariates for trainig set
           vector<vector<vector<double> > > covw(nsample); // covariates for test set
-          snp_select(ai,nv,av,aw,rs,ra,nptr,yk,ykv,ykw,covar,covv,covw);  
+          snp_select(ai,nv,av,aw,rs,ra,nptr,yk,ykv,ykw,covar,cov_ds,covv,covw);  
                                                   // select av based on training data
           int nsig=ra.size();                     // no. of selected snps
           s+=nsig;
           if(master) cout << nsig << " SNPs selected with p < " << pcut << endl << endl;
+          if(q_dump){
+            ofstream file;
+            stringstream ia;
+            ia << nv;
+            file.open(("snp_list"+ia.str()+".txt").c_str(),ios::out);
+            for(int i=0;i<nsig;i++)
+              file << ra[i] << endl;
+            file.close();
+          }
           if(nsig==0){
             cerr << " Try increasing pcut \n";
             end();
@@ -1271,7 +1284,7 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
   vector<vector<double> > ykw(nsample);   // not used
   vector<vector<vector<double> > > covv(nsample);
   vector<vector<vector<double> > > covw(nsample);
-  snp_select(ai,-1,av,aw,rs,ra,nptr,yk,ykv,ykw,covar,covv,covw);
+  snp_select(ai,-1,av,aw,rs,ra,nptr,yk,ykv,ykw,covar,cov_ds,covv,covw);
   int nsig=ra.size();                     // no. of selected snps
   if(master) cout << nsig << " SNPs selected with p < " << pcut << endl << endl;
   if(nsig==0){
@@ -1491,8 +1504,8 @@ void snp_select(const vector<vector<vector<bool> > > &ai,int nv,
   vector<vector<vector<vector<bool> > > > &av,vector<vector<vector<vector<bool> > > > &aw,
   const vector<string> &rs,vector<string> &ra,const vector<vector<int> > &nptr,
   const vector<vector<double> > &yk,vector<vector<double> > &ykv,vector<vector<double> > &ykw,
-  const vector<vector<vector<double> > > &covar,vector<vector<vector<double> > > &covv,
-  vector<vector<vector<double> > > &covw){
+  const vector<vector<vector<double> > > &covar,const vector<vector<vector<int> > > &cov_ds,
+  vector<vector<vector<double> > > &covv,vector<vector<vector<double> > > &covw){
 
   int nsnp=ai[0][0].size()/2;
   int nsample=nptr.size()-1;
@@ -1513,6 +1526,7 @@ void snp_select(const vector<vector<vector<bool> > > &ai,int nv,
       vector<short> ak;
       vector<double> ykl;
       vector<vector<double> > covl;
+//    vector<vector<int> > cov_dsl=cov_ds[s];
       int ymax=(q_qt ? 1 : 2);
       for(int y=0;y<ymax;y++){
         int nsize=nptr[s+1][y]-nptr[s][y];
@@ -1536,6 +1550,8 @@ void snp_select(const vector<vector<vector<bool> > > &ai,int nv,
               covl.push_back(covar[s][n]);
           }
         }
+//      if(y==0 && q_qt && q_covar)
+//        chk_covar(covl,cov_dsl);             // check for invariant covariates
         fr1[y][0]/=nmiss[y];
         fr1[y][1]/=nmiss[y];
         if(q_qt){
@@ -1561,7 +1577,7 @@ void snp_select(const vector<vector<vector<bool> > > &ai,int nv,
           if(t==0)
             nna=false;                            // avoid singular matrix in qtlr_assoc
           else
-            nna=qtlr_assoc(ak,ykl,nmiss[0],q,h,r2,covl,bcov);
+            nna=qtlr_assoc(ak,ykl,nmiss[0],q,h,r2,covl,cov_ds[s],bcov);
         }
       }
       if(nna){
@@ -3031,3 +3047,34 @@ void ishuffle(vector<int> &indx){
     indx[j]=tmp;
   }
 }
+
+void chk_covar(vector<vector<double> > &cov,vector<vector<int> > &cov_ds){
+
+  vector<vector<double> > cov0=cov;
+  vector<vector<int> > cov_ds0=cov_ds;
+
+  int nind=cov0.size();
+  int ncovar=cov0[0].size();
+  for(int n=0;n<nind;n++)
+    cov[n].resize(0);
+  cov_ds.resize(0);
+  int k=0;
+  for(int m=0;m<ncovar;m++){
+    if(cov_ds0[m].size()>0){             // discrete
+      bool flag=true;
+      int c=cov0[0][m];
+      for(int n=1;n<nind;n++){
+        if(cov0[n][m]!=c){
+          flag=false;
+          break;
+        }
+      }
+      if(flag) continue;                       // no variation: skip
+    }
+    for(int n=0;n<nind;n++)
+      cov[n].push_back(cov0[n][m]);
+    cov_ds.push_back(cov_ds0[m]);
+    k++;
+  }
+}
+

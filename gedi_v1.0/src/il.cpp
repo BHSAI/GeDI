@@ -213,12 +213,12 @@ void il_bed(string &meta,string &out_file,bool q_lr){
 
   vector<vector<vector<double> > > covar(nsample);
   int ncovar=0;                         // read covariates
-  vector<vector<int> > cov_ds;
+  vector<vector<vector<int> > > cov_ds(nsample);
   if(q_covar){
     for(int s=0;s<nsample;s++){
       covar[s].resize(ntot);
       string file=mbfile[s]+".covar";
-      read_cov(file,fid[s],iid[s],covar[s],cov_ds);
+      read_cov(file,fid[s],iid[s],covar[s],cov_ds[s]);
     }
     ncovar=covar[0][0].size();
   }
@@ -348,7 +348,7 @@ void il_bed(string &meta,string &out_file,bool q_lr){
           if(q_qtpl)
             nna=qt_assoc(ak,yk[s],fr1[0],fry,nmiss[0],q,h);
           else
-            nna=qtlr_assoc(ak,yk[s],nmiss[0],q,h,r2,covar[s],bcov);
+            nna=qtlr_assoc(ak,yk[s],nmiss[0],q,h,r2,covar[s],cov_ds[s],bcov);
         }
       }
       else{                                  // LR inference
@@ -504,13 +504,13 @@ void il_tped(string &tped,string &tfam,string &meta_file,string &out_file,bool q
    // read covariates
    int ncovar=0;
    vector<vector<vector<double> > > covar(nsample);
-   vector<vector<int> > cov_ds;
+   vector<vector<vector<int> > >  cov_ds(nsample);
    if(q_covar){
      for(int s=0;s<nsample;s++){
        int ntot=nptr[s+1][0]-nptr[s][0];
        if(!q_qt) ntot+=nptr[s+1][1]-nptr[s][0];
        covar[s].resize(ntot);
-       read_cov(mtcov[s],fid[s],iid[s],covar[s],cov_ds);
+       read_cov(mtcov[s],fid[s],iid[s],covar[s],cov_ds[s]);
      }
      ncovar=covar[0][0].size();
    }
@@ -640,7 +640,7 @@ void il_tped(string &tped,string &tfam,string &meta_file,string &out_file,bool q
            if(q_qtpl)
              nna=qt_assoc(ak,yk[s],f1[0],fry,nmiss[0],q,h);
            else
-             nna=qtlr_assoc(ak,yk[s],nmiss[0],q,h,r2,covar[s],bcov);
+             nna=qtlr_assoc(ak,yk[s],nmiss[0],q,h,r2,covar[s],cov_ds[s],bcov);
          }
        }
        else{

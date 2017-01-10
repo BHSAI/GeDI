@@ -122,6 +122,7 @@ int main(int argc,char* argv[]){
    bool q_par=false;         // parameter file
    bool q_cl=false;          // flag for collective loci analysis
    bool q_qi=false;          // flag for CL marginal p-value calculation
+// bool q_ld=false;          // true if ld was set explicitly
 
    lambda.push_back(0.1);    // default lambda
    eps.push_back(0.1);       // default epsilon
@@ -262,6 +263,7 @@ int main(int argc,char* argv[]){
        else if(flag=="seed")
          Seed=atoi(argv[i++]);
        else if(flag=="ld" || flag=="lhj"){
+//       q_ld=true;
          string nu;
          lambda.resize(0);
          while(1){
@@ -432,16 +434,17 @@ int main(int argc,char* argv[]){
            else
              pr_tped(tped_file,tfam_file,meta_file,par_file,out_file);
          }
+         return 0;
        }
        else{
          if(master) cerr << "Please specify tped/tfam (or binary) file. Bye!\n";
          end();
        }
      }
-     else{
-       q_qtil=true;
-       cl_main(tped_file,tfam_file,meta_file,par_file,out_file,q_lr,q_pr,q_qi);
-     }
+//   else{
+//     q_qtil=q_pl=true;
+//     cl_main(tped_file,tfam_file,meta_file,par_file,out_file,q_lr,q_pr,q_qi);
+//   }
      if(q_cl){
        if(master) cerr << "IL or CL but not both\n";
        end();
@@ -535,17 +538,23 @@ int main(int argc,char* argv[]){
          end();
        }
      }
-     if(q_tped || q_meta || q_metab || bfile!="")
+     if(q_tped || q_meta || q_metab || bfile!=""){
        cl_main(tped_file,tfam_file,meta_file,par_file,out_file,q_lr,q_pr,q_qi);
+       return 0;
+     }
      else{
        if(master) cerr << "tped/tfam files must be specified for CL. Bye!\n";
        end();
      }
    }
-   else if(q_qt && q_pl){   // qt IL
+// else if(q_qt && q_pl){   // qt IL
+   else if(q_qt){           // qt IL
      if(q_tped || q_meta || q_metab || bfile!=""){
-       q_qtil=true;
+       q_qtil=q_pl=true;
+//     if(!q_ld)
+//       lambda[0]=0;
        cl_main(tped_file,tfam_file,meta_file,par_file,out_file,q_lr,q_pr,q_qi);
+       return 0;
      }
      else{
        if(master) cerr << "Input files not specified. Bye!\n";

@@ -146,7 +146,7 @@ void cl_qt(string &meta){
   vector<vector<double> > ykw(nsample);
   vector<vector<vector<double> > > covv(nsample);
   vector<vector<vector<double> > > covw(nsample);
-  snp_select(ai,-1,av,aw,rs,ra,nptr,yk,ykv,ykw,covar,covv,covw);
+  snp_select(ai,-1,av,aw,rs,ra,nptr,yk,ykv,ykw,covar,cov_ds,covv,covw);
   int nsig=ra.size();
   if(master) cout << nsig << " SNPs selected with p < " << pcut << endl << endl;
   if(nsig==0){
@@ -322,7 +322,8 @@ bool qt_assoc(const vector<short> &ak,const vector<double> &yk,double f1[2],doub
 }
 
 // linear regression QT
-bool qtlr_assoc(const vector<short> &ak,const vector<double> &yk,int &nind,double &q,vector<double> &h,double &r2,const vector<vector<double> > &covar,vector<double> &bcov){
+bool qtlr_assoc(const vector<short> &ak,const vector<double> &yk,int &nind,double &q,vector<double> &h,double &r2,const vector<vector<double> > &covar,const vector<vector<int> > &cov_dsl,
+    vector<double> &bcov){
 
   double beta0,beta1;
   if(!q_covar){
@@ -361,9 +362,14 @@ bool qtlr_assoc(const vector<short> &ak,const vector<double> &yk,int &nind,doubl
     r2=1-s2/(y2-nind*yave*yave);
   }
   else{                         // with covariates
+
+    vector<vector<double> > cov2=covar;
+    vector<vector<int> > cov2_dsl=cov_dsl;
+    chk_covar(cov2,cov2_dsl);               // remove singular part of covar
+
     int ndim=2;
     int ncovar=0;
-    ncovar=covar[0].size();
+    ncovar=cov2[0].size();
     ndim+=ncovar;
     if(nind<=ndim){
       if(master) cerr << "Too many covariates. Bye!\n";
@@ -377,7 +383,7 @@ bool qtlr_assoc(const vector<short> &ak,const vector<double> &yk,int &nind,doubl
       gsl_matrix_set(A,0,k,1);       // intercept
       gsl_matrix_set(A,1,k,a);       // genotype
       for(int m=0;m<ncovar;m++)
-        gsl_matrix_set(A,m+2,k,covar[k][m]);  // covariates
+        gsl_matrix_set(A,m+2,k,cov2[k][m]);  // covariates
     }
     vector<double> beta(ndim);
 
@@ -427,7 +433,7 @@ bool qtlr_assoc(const vector<short> &ak,const vector<double> &yk,int &nind,doubl
       a=code(a,model);
       double yhat=beta0+beta1*a;
       for(int m=0;m<ncovar;m++)
-        yhat+=beta[m+2]*covar[k][m];
+        yhat+=beta[m+2]*cov2[k][m];
       double df=yk[k]-yhat;
       s2+=df*df;                     // residual
       y2+=yk[k]*yk[k];
