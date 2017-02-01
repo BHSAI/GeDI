@@ -1755,6 +1755,7 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,const vector<vec
 #ifdef MPIP
 //    int ndata=3*isnp*(L+(nsnp-1)*L*L)+4;
       int ndata=3*isnp*(L+(nsnp-1)*L*L)+5;    // extra one for q_crash
+      if(q_qtil) ndata=3*isnp*L+5;
       double *data=new double[ndata];         // package for each proc
       double *data0=new double[ndata*nproc];  // received data for master
       for(int i=0;i<ndata;i++) data[i]=0;
@@ -1813,6 +1814,7 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,const vector<vec
       int idata=0;   // pack data
       for(int i=istart;i<istop;i++) for(int y=0;y<3;y++) for(int l0=0;l0<L;l0++){
         data[idata++]=h[si][y][i][l0];
+        if(q_qtil) continue;
         for(int j=0;j<nsnp;j++) for(int l1=0;l1<L;l1++)
           if(j!=i) data[idata++]=J[si][y][i][j][2*l0+l1];
       }
@@ -1831,6 +1833,7 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,const vector<vec
           if(i>=nsnp) break;
           for(int y=0;y<3;y++) for(int l0=0;l0<L;l0++){
             h[si][y][i][l0]=data0[idata++];
+            if(q_qtil) continue;
             for(int j=0;j<nsnp;j++) for(int l1=0;l1<L;l1++)
               if(j!=i) J[si][y][i][j][2*l0+l1]=data0[idata++];
           }

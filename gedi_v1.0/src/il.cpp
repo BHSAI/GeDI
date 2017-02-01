@@ -744,6 +744,8 @@ void read_cov(const string &file,const vector<string> &fid,const vector<string> 
      ncovar++;
      header.push_back(st);
    }
+   vector<bool> disc(ncovar);
+   for(int m=0;m<ncovar;m++) disc[m]=true;     // true if all discrete 
    int n=0;
    while(getline(fl,line)){
      covar[n].resize(ncovar);
@@ -756,8 +758,13 @@ void read_cov(const string &file,const vector<string> &fid,const vector<string> 
        end();
      } 
      int m=0;
-     double var;
-     while(iss >> var) covar[n][m++]=var;
+     string str;
+     while(iss >> str){
+       for(unsigned i=0;i<str.length();i++)
+         if(str.at(i)=='.')   // there is a period in the number
+           disc[m]=false;
+       covar[n][m++]=atof(str.c_str());
+     }
      n++;
      if(n==int(covar.size())) break;
    }
@@ -770,24 +777,20 @@ void read_cov(const string &file,const vector<string> &fid,const vector<string> 
    if(!q_lr){            // for DDA, find discrete covariates
      int ncd=0;
      for(int m=0;m<ncovar;m++){
-       bool digit=true;
+       if(!disc[m]) continue;
        int cmin=0; int cmax=0;
        for(int n=0;n<int(fid.size());n++){
-         int iv=floor(covar[n][m]);
+         int iv=covar[n][m];
          if(iv<cmin) cmin=iv;
          if(iv>cmax) cmax=iv;
-         if(fabs(iv-covar[n][m])>Tolq) digit=false;
-         if(!digit) break;
        }
-       if(digit){
-         if(cmin==cmax){
-           if(master) cerr << "No variation in covariate #" << m+1 << ". Bye!\n";
-           end();
-         }
-         cov_ds[m].push_back(cmin);
-         cov_ds[m].push_back(cmax);
-         ncd++;
+       if(cmin==cmax){
+         if(master) cerr << "No variation in covariate #" << m+1 << ". Bye!\n";
+         end();
        }
+       cov_ds[m].push_back(cmin);
+       cov_ds[m].push_back(cmax);
+       ncd++;
      }
      if(master) cout << ncovar << " covariates (" << ncovar-ncd << " continuous + " << ncd
                      << " discrete) for ";

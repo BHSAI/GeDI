@@ -705,7 +705,7 @@ double qt_pl(bool q_null,int i0,const vector<vector<bool> > &ai,const vector<dou
     f0=-s->f;
   }while(status==GSL_CONTINUE && iter <Imax);
   if(status){
-    cerr << " GSL iteration code " << status << endl;
+    if(master) cerr << " GSL iteration code " << status << endl;
 //  end();
 //  return false;
     q_crash=true;
