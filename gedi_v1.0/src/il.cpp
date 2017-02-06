@@ -876,7 +876,7 @@ void il_stat(ofstream& of,int nchr,string &rsn,int pos,char minor,int nmiss[],bo
        if(q_qtpl)
          of << setw(4) << df << " ";
        double p=1.0;
-       if(q_qtpl){
+       if(!q_qt || q_qtpl){
          if(q>0)
 //         p=gsl_sf_gamma_inc_Q(0.5*df,q/2);
            p=gsl_cdf_chisq_Q(q,df);
@@ -895,7 +895,7 @@ void il_stat(ofstream& of,int nchr,string &rsn,int pos,char minor,int nmiss[],bo
        if(model==GEN) of << setw(11) << left << "NA" << " ";
        of << setw(11) << left << "NA" << " ";
        of << setw(11) << left << "NA" << " ";
-       of << setw(4) << left << "NA" << " ";
+//     of << setw(4) << left << "NA" << " ";
        of << setw(11) << left << "NA" << endl;
      }
 }
