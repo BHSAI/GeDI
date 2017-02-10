@@ -874,7 +874,7 @@ void il_stat(ofstream& of,int nchr,string &rsn,int pos,char minor,int nmiss[],bo
        }
        of << setw(11) << q << " ";
        int df=L*nsample;
-       if(q_qtpl)
+       if(!q_qt || q_qtpl)
          of << setw(4) << df << " ";
        double p=1.0;
        if(!q_qt || q_qtpl){
@@ -896,7 +896,7 @@ void il_stat(ofstream& of,int nchr,string &rsn,int pos,char minor,int nmiss[],bo
        if(model==GEN) of << setw(11) << left << "NA" << " ";
        of << setw(11) << left << "NA" << " ";
        of << setw(11) << left << "NA" << " ";
-//     of << setw(4) << left << "NA" << " ";
+       of << setw(4) << left << "NA" << " ";
        of << setw(11) << left << "NA" << endl;
      }
 }
