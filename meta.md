@@ -27,7 +27,7 @@ In the binary case, it is assumed that file1.bed, file1.bim, and file1.fam etc e
   
 In IL, the output file will list the combined likelihood ratio statistic (q), the degrees of freedom (df), and p-value (P) of samples for which there were sufficient statistics. If a sub-sample leads to an inference failure, that particular sample is skipped and df will be less than the total number of samples times 1 (DOM/REC) or 2 (GEN). If inference fails for all samples, NA results.
 
-In CL, the single-SNP and interaction parameters inferred are averaged over samples weighted by the square-root of effective sample sizes with sample weight = 2/sqrt(1/n_case+1n_control). As in single-sample CL, p-values have to be estimated manually by permutation-resampling. 
+In CL, the single-SNP and interaction parameters inferred are averaged over samples weighted by the square-root of effective sample sizes with sample weight = 2/sqrt(1/n_case+1/n_control). As in single-sample CL, p-values have to be estimated manually by permutation-resampling. 
 
 ***
 [Up](README.md)
