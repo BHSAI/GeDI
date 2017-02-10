@@ -216,6 +216,7 @@ void il_bed(string &meta,string &out_file,bool q_lr){
   vector<vector<vector<int> > > cov_ds(nsample);
   if(q_covar){
     for(int s=0;s<nsample;s++){
+      int ntot=nptr[s+1][0]-nptr[s][0];
       covar[s].resize(ntot);
       string file=mbfile[s]+".covar";
       read_cov(file,fid[s],iid[s],covar[s],cov_ds[s]);
@@ -312,15 +313,15 @@ void il_bed(string &meta,string &out_file,bool q_lr){
             gi1+=(bit[m-2] ? a1[i] : a0[i]);
           }
           ind++;
-          if(ind==ntot) break;
+          if(ind==nsize) break;
           m-=2;
         }
-        if(ind==ntot) break;
+        if(ind==nsize) break;
       }
       int nmiss[2]={0,};
       double fr1[2][2]={{0,}};
       double fry[2]={0,};    // y-weighted freq. for qt
-      freq(ntot,nmiss,gi0,gi1,phe[s],minor,major,rsk,fr1,s);  // if s==0, minor/major are set; otherwise 
+      freq(nsize,nmiss,gi0,gi1,phe[s],minor,major,rsk,fr1,s);  // if s==0, minor/major are set; otherwise 
                                                          // they are used and not changed
       vector<short> ak;
       if(q_qt){
