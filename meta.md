@@ -23,15 +23,8 @@ In the binary case, it is assumed that file1.bed, file1.bim, and file1.fam etc e
 
     $ plink-1.90 --bfile file --keep sample1.fam --keep-allele-order --make-bed --out file1
     $ plink-1.90 --bfile file --keep sample2.fam --keep-allele-order --make-bed --out file2
-    $ gedi -cl --metab slist.txt 
-    
- where file slist.txt contains
- 
-    file1
-    file2
-
-to do meta-analysis.
-
+    $ gedi -cl --metab flist.txt 
+  
 ***
 [Up](README.md)
 
