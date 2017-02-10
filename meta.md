@@ -19,7 +19,7 @@ where the "flist.txt" lists
     file1 
     file2
 
-In the binary case, it is assumed that file1.bed, file1.bim, and file1.fam etc exist in the current directory, the order of SNPs as well as allele codings in each sample are the same; errors will occur if not. Please note that PLINK will often recode SNP alleles upon sample changes: e.g., to form a sub-group of individuals listed in files sample1.fam and sample2.fam from a binary file, use
+In the binary case, it is assumed that file1.bed, file1.bim, and file1.fam etc exist in the current directory, the order of SNPs as well as allele codings in each sample are the same; errors will occur if not. Please note that PLINK will often recode SNP alleles upon sample changes: e.g., to form sub-groups of individuals listed in files sample1.fam and sample2.fam from a binary file, use
 
     $ plink-1.90 --bfile file --keep sample1.fam --keep-allele-order --make-bed --out file1
     $ plink-1.90 --bfile file --keep sample2.fam --keep-allele-order --make-bed --out file2
