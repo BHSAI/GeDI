@@ -830,7 +830,7 @@ void header(ofstream& of,int nind[2]){
      of << setw(11) << "t" << " ";
    else
      of << setw(11) << "q" << " ";
-   if(q_qtpl) of << setw(4) << "df" << " ";
+   if(!q_qt || q_qtpl) of << setw(4) << "df" << " ";
    of << setw(11) << "P" << " ";
    if(!q_qt){
      double pd=double(nind[1])/(nind[0]+nind[1]);
