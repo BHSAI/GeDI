@@ -1,4 +1,4 @@
-##Collective Inference (CL)
+## Collective Inference (CL)
 
 In CL analysis, all single-locus and pairwise interaction effects are inferred simultaneously:
 
@@ -23,7 +23,7 @@ where the first line shows alpha and disease prevalence values. Below the line, 
 
 There are three methods available for CL:
 
-###1. Pseudo-likelihood (PL)
+### 1. Pseudo-likelihood (PL)
 
 The default is pseudo-likelihood maximization, specified by
 
@@ -49,7 +49,7 @@ Tolerance and maximum iteration are changed by
 
 The PL option is parallelized; when run on multiple processors with mpirun, the scaling will be close to linear.
 
-###2. Mean field (MF)
+### 2. Mean field (MF)
 
 The mean field option is specified by
 
@@ -61,7 +61,7 @@ This option can be applied to large data sets (_m_ up to thousands) with some co
 
 (default). Although CL should become IL with "--eps 0", the outcomes will not be exactly same because in CL, missing genotypes are counted as major alleles, and MF includes one prior count of individual with uniform genotype frequencies to avoid singularity. One can experiment with different values or use [cross-validation](cv.md) to find an optimal condition. As in PL, multiple values of eps can be specified for batch runs. 
 
-###3. Mean field parallel (MFP)
+### 3. Mean field parallel (MFP)
 
 In contrast to PL, which is automatically run in parallel if possible, MF used with -mf is serial by default. When compiled and run in MPI, a parallel version of MF (using SCALAPACK) can be specified by
 
@@ -69,7 +69,7 @@ In contrast to PL, which is automatically run in parallel if possible, MF used w
 
 Note that this parallel MFP can be slower than -mf unless the number of SNPs is larger than several hundreds.
 
-###3. Exact enumeration (EE)
+### 4. Exact enumeration (EE)
 
 One may choose to do an exact enumeration (EE) DDA by specifying the option 
 
@@ -78,7 +78,7 @@ One may choose to do an exact enumeration (EE) DDA by specifying the option
 This is the most accurate method but the computational cost scales exponentially with the number of SNPs _m_; execution time will become impractical for _m_ much larger than ~20. Use a p-value cutoff (e.g., "--pcut 1e-7") to reduce the SNP number. EE is useful when trying to validate other approximate treatments (PL or MF). It uses the same penalizing parameters (lambda1, lambda2) as PL with the same syntax. Site and interaction [tests](tests.md)
 can also be performed to calculate partial p-values of loci and interactions. These values from EE, if it is feasible to calculate them, will be more accurate than PL.
 
-###4. Logistic regression (LR)
+### 5. Logistic regression (LR)
 
 One can use logistic regression for CL inference by specifying 
 
