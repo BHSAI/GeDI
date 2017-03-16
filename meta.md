@@ -1,4 +1,4 @@
-##Meta-analysis
+## Meta-analysis
 To increase power, multiple samples can be combined into a single meta-analysis. In discrete discriminant analysis (DDA), the likelihood ratio statistics of each sub-samples are summed into a total, to which statistical tests can be performed. As prerequisites, each sample must have identical sets of SNP lists. Input files can be prepared using PLINK.
 
 In both independen-SNP inference (IL) and collective inference (CL), the command is
