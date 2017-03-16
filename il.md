@@ -1,4 +1,4 @@
-###Independent loci analysis
+### Independent loci analysis
 
 Here, a set of genotype/phenotype data are read and each SNP is evaluated separately for association with disease.
 
