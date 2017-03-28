@@ -1,12 +1,12 @@
-##Current limitations
+## Current limitations
 
-1. IL prediction, including cross-validation, cannot use binary file input:
+1. IL prediction without cross-validation, cannot use meta-analysis:
 
-        -il -pr --bfile file
+        -il -pr --metab flist.txt (No)
 
 2. IL cross-validation cannot use logistic regression:
 
-        -il -pr -lr
+        -il -pr -lr (No)
 
 
 ***

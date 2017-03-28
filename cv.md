@@ -1,13 +1,13 @@
-##Prediction and cross-validation
+## Prediction and cross-validation
 
-###1. Simple prediction
+### 1. Simple prediction
 One can construct a disease risk model based on inference parameters and apply it to separate data using the option 
 
     -pr
 
 Note that this inference/prediction workflow is meaningful only when the training and test data sets are distinct. For IL, a typical application would be to derive single-SNP parameters for all SNPs in the whole-genome data ("manhattan plot"), and then estimate disease risk of a new set of individuals based on a subset of SNPs. For CL, on the other hand, one would normally derive a subset of SNPs first, infer parameters within this set using the training data, and predict risk probabilities of individuals in the test data using the same SNPs.
 
-####IL
+#### IL
 
 For IL prediction, one reads a result file (option --par file.par) and specifies data files for the test:
 
@@ -37,7 +37,7 @@ where each line lists predicted disease risk probability (first column) and phen
 
 be sure to set it in prediction as well.
 
-####CL
+#### CL
 
 The CL prediction works similarly:
 
@@ -48,7 +48,7 @@ However, p-value cutoff is not used and all SNPs in "file.bed" will be included.
 
 Because the SNP selection will be based on parameter file, p-value cutoff is not used and --pcut will be ignored if present. This procedure will also use the alpha parameter read from the parameter file for prediction, which assumes the test set has the same case/control composition as the training set. If a different prevalence is desired for prediction, use the option "--prev 0.1" and the program will recalculate prediction alpha parameter based on the prescribed and training set prevalences. 
 
-###2. Cross-validation
+### 2. Cross-validation
 
 More often, one has a single data set and wishes to perform cross-validation using training and test sub-samples. To do this, simply omit the option "--par file.par":
 
@@ -60,16 +60,16 @@ In cross-validation, case and control samples are divided into _k_ ("multiplicit
                 case                            control
                 |---------------------------|   |------------------------------|
 
-    training	|--------------------|          |-----------------------|
+    training    |--------------------|          |-----------------------|
     test                             |------|                           |------|
 
-    training	|-------------|      |------|   |---------------|       |------|
+    training    |-------------|      |------|   |---------------|       |------|
     test                      |------|                          |-------|
 
-    training	|------|      |-------------|   |-------|       |--------------|
+    training    |------|      |-------------|   |-------|       |--------------|
     test               |------|                         |-------|
 
-    training	       |--------------------|           |----------------------|
+    training           |--------------------|           |----------------------|
     test        |------|                        |-------|
 
 

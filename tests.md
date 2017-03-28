@@ -1,6 +1,6 @@
-##Statistical Tests
+## Statistical Tests
 
-####1.Single-SNP and interaction tests
+#### 1. Single-SNP and interaction tests
 In collective inference ([CL](cl.md)), one can additionally perform statistical tests for each locus and pairwise interactions. These tests are based on likelihood ratio statistics derived by comparing the likelihood of the full CL model and that of reduced model where single-SNP parameter of a certain site i or interaction parameters of a given SNP pair ij are pre-set as values corresponding to the case + control pooled sample. Add the option
 
     -pi
@@ -23,7 +23,7 @@ and each unique pair of SNPs will be tested, with the results written to "gedi.q
 
 These calculations are parallized; each single-SNP and interaction calculations will be distributed to available cores when run with mpirun.
 
-####2. Null sampling
+#### 2. Null sampling
 
 To estimate interaction p-values, one can first perform the q_ij calculation above, and then sample the null distribution using bootstrap resampling:
 
