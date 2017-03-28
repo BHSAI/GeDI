@@ -1,0 +1,37 @@
+#
+CC=CC
+FC=ftn
+#GSLDIR=/home/hwoo/local
+#CFLAGS=-I$(GSLDIR)/include -c -DMPIP -O2
+FFLAGS=-c -O2
+CFLAGS=-c -DMPIP -O2 -I$(GSLDIR) -I/opt/cray/mpt/7.2.6/gni/mpich-cray/8.3
+FFLAGS=-c -O2
+LDFLAGS=-O2 -L/app/COST/gsl-1.15-gnu/lib -lgsl \
+        -L/app/COST/scalapack/2.0.2/gnu/craympt/lib -lscalapack \
+        -L/app/COST/lapack/3.5.0/gnu/lib -llapack -lrefblas 
+
+all: gedi
+
+gedi: main.o il.o il_lr.o cl.o cl_lr.o invrs.o
+	$(CC) main.o il.o il_lr.o cl.o cl_lr.o invrs.o $(LDFLAGS) -o gedi
+
+main.o: main.cpp
+	$(CC) $(CFLAGS) main.cpp
+
+il.o: il.cpp
+	$(CC) $(CFLAGS) il.cpp
+
+il_lr.o: il_lr.cpp
+	$(CC) $(CFLAGS) il_lr.cpp
+
+cl.o: cl.cpp
+	$(CC) $(CFLAGS) cl.cpp
+
+cl_lr.o: cl_lr.cpp
+	$(CC) $(CFLAGS) cl_lr.cpp
+
+invrs.o: invrs.f
+	$(FC) $(FFLAGS) invrs.f
+
+clean: 
+	rm -rf *.o gedi

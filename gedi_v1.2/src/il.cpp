@@ -1165,6 +1165,7 @@ void read_par(ifstream &prf,double &alpha,vector<double> &beta1,vector<double> &
 
   int nsnp=beta1.size();
   int i=0;
+  int df;
 
   while(getline(prf,line)){
     istringstream iss(line);
@@ -1182,6 +1183,7 @@ void read_par(ifstream &prf,double &alpha,vector<double> &beta1,vector<double> &
       beta2[i]=log(beta);
     }
     iss >> q;
+    iss >> df;
     iss >> pv[i];
     if(pv[i]<=pcut)
       alpha+=ali;
