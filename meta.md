@@ -32,4 +32,4 @@ In CL, the single-SNP and interaction parameters inferred are averaged over samp
 ***
 [Up](README.md)
 
-[Next](limit.md)
+[Next](qt.md)
