@@ -39,6 +39,7 @@ extern float Max_mem;    // maximum memory allowed
 extern bool q_minor_ctl; // true if minor allele define wrt control only
 extern double Prev;      // disease prevalence
 extern double pcut;      // p-value cutoff
+extern double corr0;     // correlation under covariates-only
 extern bool q_ee;        // true if EE
 extern bool q_mf;        // true if MF
 extern bool q_cv;        // true if cross-validation
@@ -69,6 +70,7 @@ extern bool q_qt;        // true if quantitative trait
 extern bool q_qtil;      // true if quantitative trait IL
 extern bool q_qtpl;      // true if using PL for IL in CL (!)
 extern bool q_covar;     // true if covariates
+extern bool q_covar0;    // true covariate-only
 extern bool q_dump;      // true if dumping snp lists in CV
 extern int Seed;         // random no. seed
 extern string cvar_file; // covariate file
@@ -295,6 +297,7 @@ double pray(double y,void *params){   // returns Pr(ai,ci|y)*Pr(y)*sqrt(2pi)*sig
 
   Pari *par=(Pari *)params;
   int nsnp=(par->ai).size()/2;
+  if(q_covar0) nsnp=0;
 
   double f=1;
   for(int i=0;i<nsnp;i++){
@@ -428,6 +431,7 @@ void pr_cl_qtlr(ofstream &of,const vector<vector<vector<vector<bool> > > > &ai,
   for(int s=0;s<nsample;s++){
     int nind=int(ai[s][0].size());
     int nsnp=int(ai[s][0][0].size()/2);
+    if(q_covar0) nsnp=0;
     for(int n=0;n<nind;n++){
       double yp=th.alpha;
       for(int i=0;i<nsnp;i++){
@@ -716,7 +720,7 @@ void bin_read(string &meta,int &nsample,vector<vector<int> > &nptr,
     }
   }
   
-  if(master){
+  if(master && !q_covar0){
     cout << "Reading genotypes from ";
     for(int s=0;s<nsample;s++){
       cout << mbfile[s]+".bed";
@@ -739,6 +743,7 @@ void bin_read(string &meta,int &nsample,vector<vector<int> > &nptr,
     }
   }
 
+  if(q_covar0) nsnp=0;
   for(int i=0;i<nsnp;i++){
     if(master && i>=Npr && i%Npr==0) cout << "reading " << i << "'th SNP..." << endl;
 
@@ -1208,7 +1213,7 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
               file << ra[i] << endl;
             file.close();
           }
-          if(nsig==0){
+          if(nsig==0 && !q_covar0){
             cerr << " Try increasing pcut \n";
             end();
           }
@@ -1418,7 +1423,7 @@ void par_out(ofstream &of,const vector<string> &rs,double dev,int nsig,
 bool comp(vector<double> a,vector<double> b){ return a[0]>b[0]; }
 // select significant snps based on training set
 
-// calculats receiver operating characterisic and its area under curve
+// calculats receiver operating characterisic and its area under curve (or correlation for qt)
 void roc(ofstream &ocv,vector<vector<double> > &risk){
 
     double n0=0;
@@ -1439,49 +1444,67 @@ void roc(ofstream &ocv,vector<vector<double> > &risk){
     double fp=0;
     double tp=0;
     double fprev=0;
-    double r2=0;
+    double r=0;
     double r1=0;
     double r0=0;
     double v0=0;
     double v1=0;
-    for(int k=0;k<ntot;k++){
-      if(q_qt){
-        if(master) of << risk[k][0] << " " << risk[k][1] << endl;
-        r2+=risk[k][0]*risk[k][1];
+    if(q_qt){
+      for(int k=0;k<ntot;k++){
         r0+=risk[k][0];
         r1+=risk[k][1];
-        v0+=risk[k][0]*risk[k][0];
-        v1+=risk[k][1]*risk[k][1];
       }
-      else{
-        if(risk[k][0]!=fprev){
-          vector<double> dummy(2);
-          dummy[0]=fp/n0;
-          dummy[1]=tp/n1;
-          roc.push_back(dummy);
-          if(master) of << dummy[0] << " " << dummy[1] << endl;
-          fprev=risk[k][0];
+      r0/=ntot;
+      r1/=ntot;
+      for(int k=0;k<ntot;k++){
+        r+=(risk[k][0]-r0)*(risk[k][1]-r1);
+        v0+=(risk[k][0]-r0)*(risk[k][0]-r0);
+        v1+=(risk[k][1]-r1)*(risk[k][1]-r1);
+      }
+      r/=sqrt(v0*v1);
+      if(master){ 
+        cout << "R = " << r << endl;
+        cout << "R2 = " << r*r << endl;
+      }
+      if(!q_covar && ntot>2){
+        double t=r*sqrt((ntot-2)/(1-r*r));
+        double p=gsl_cdf_tdist_Q(t,double(ntot-2));
+        if(master){
+         cout << "P = " << p << endl;
+          if(ocv.is_open()) ocv << r << " " << p << endl;
         }
-        if(round(risk[k][1])==1)
-          tp+=1;
-        else
-          fp+=1;
       }
+      else if(q_covar && ntot>3){
+        double f=0.5*log((1+r)/(1-r));  // Fisher transformation
+        double f0=0.5*log((1+corr0)/(1-corr0)); 
+        double z=sqrt(ntot-3.0)*(f-f0);
+        double p=gsl_cdf_ugaussian_Q(z);
+        if(master){
+         cout << "P(R0 = " << corr0 << ") = " << p << endl;
+          if(ocv.is_open()) ocv << r << " " << p << endl;
+        }
+      }
+      else if(ocv.is_open() && master) ocv << r << endl;
+      if(master) cout << endl;
+      return;
+    }
+
+    for(int k=0;k<ntot;k++){    // case-control
+      if(risk[k][0]!=fprev){
+        vector<double> dummy(2);
+        dummy[0]=fp/n0;
+        dummy[1]=tp/n1;
+        roc.push_back(dummy);
+        if(master) of << dummy[0] << " " << dummy[1] << endl;
+        fprev=risk[k][0];
+      }
+      if(round(risk[k][1])==1)
+        tp+=1;
+      else
+        fp+=1;
     }
     if(!master) return;
     of.close();
-    if(q_qt){
-//    if(!q_pr){
-//      r2=1-(v1-2*r2+v0)/(v1-r1*r1/ntot);            // variance explained
-//      cout << "R-square = " << r2 << endl << endl;
-//    }
-      r2=ntot*r2-r0*r1;                               // cor(y,yhat)^2
-      r2=r2*r2/(ntot*v0-r0*r0)/(ntot*v1-r1*r1);
-      cout << "R2 = " << r2 << endl << endl;
-      if(ocv.is_open())
-        ocv << r2 << endl;
-      return;
-    }
 
     double auc=0;
     for(unsigned int k=1;k<roc.size();k++){
@@ -1514,6 +1537,7 @@ void snp_select(const vector<vector<vector<bool> > > &ai,int nv,
   vector<int> slist;
   int ncovar=0;
   if(q_covar) ncovar=covar[0][0].size();   // no. of covariates
+  if(q_covar0) nsnp=0;                     // covariate-only (no SNPs)
 
   for(int i=0;i<nsnp;i++){
     double qtot=0;
@@ -1652,6 +1676,7 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,const vector<vec
   q_crash=false;
 
   int nsnp=ai[0][0][0].size()/2;
+  if(q_covar0) nsnp=0;
   int nsample=nptr.size()-1;   // no. of samples
   vector<vector<vector<vector<double> > > > f1(nsample);   // empirical frequencies of minor alleles
   vector<vector<vector<vector<vector<float> > > > > f2(nsample);   

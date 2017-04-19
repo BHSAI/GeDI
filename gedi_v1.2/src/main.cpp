@@ -38,6 +38,7 @@ bool q_lrp=false;          // flag for parallel ridge regression
 bool q_qtpl=false;         // flag for maximum likelihood IL
 bool q_qtil=false;         // flag for qt-IL
 bool q_covar=false;        // flag for covariates
+bool q_covar0=false;       // flag for covariate-only
 bool q_nsvd=false;
 bool q_pr=false;           // flag for prediction
 bool q_lr=false;           // flag for logistic/linear regression
@@ -45,6 +46,7 @@ bool q_Lh=false;           // flag for Lh=LJ
 string excl_file="";       // snp exclusion list file 
 double pcut=-1;            // p-value cutoff for cross-validation
 double tol=1.0e-5;         // iteration tolerance
+double corr0=0;            // correlation under covariates-only
 vector<double> lambda;     // penalizer
 vector<double> eps;        // MFA regularizer
 double Prev=-1;            // disease prevalence
@@ -101,8 +103,8 @@ int main(int argc,char* argv[]){
     cout << "-----------------------------------------------------------------" << endl;
     cout << "                                                                 " << endl;
     cout << "  Genotype distribution-based inference of disease association   " << endl;
-    cout << "  October 2015                                                   " << endl;
-    cout << "  Copyright(c) 2015 BHSAI, GNU General Public License            " << endl;
+    cout << "  April 2017                                                     " << endl;
+    cout << "  Copyright(c) 2017, 2015 BHSAI, GNU General Public License      " << endl;
     cout << "  Author: Hyung Jun Woo (woo@bhsai.org)                          " << endl;
     cout << "                                                                 " << endl;
     cout << "-----------------------------------------------------------------" << endl;
@@ -204,6 +206,10 @@ int main(int argc,char* argv[]){
        }
        else if(flag=="covar")
          q_covar=true;
+       else if(flag=="covar_only"){
+         q_covar0=true;
+         q_covar=true;
+       }
        else if(flag=="qtpl"){
          q_qt=true;
          q_qtpl=true;
@@ -294,6 +300,11 @@ int main(int argc,char* argv[]){
          cvar_file=argv[i++];
          q_covar=true;
        }
+       else if(flag=="covar_only"){ // covariate file
+         cvar_file=argv[i++];
+         q_covar=true;
+         q_covar0=true;
+       }
        else if(flag=="cvrout"){ // covar parameter output
          cvrout=argv[i++];
        }
@@ -320,6 +331,8 @@ int main(int argc,char* argv[]){
          ncv=atoi(argv[i++]);
        else if(flag=="pcut")
          pcut=atof(argv[i++]);
+       else if(flag=="r0")
+         corr0=atof(argv[i++]);
        else if(flag=="bfile")
          bfile=argv[i++];      // binary data file prefix
        else if(flag=="chr")
@@ -453,7 +466,10 @@ int main(int argc,char* argv[]){
    if(q_cl){
      if(master){
        cout << "Collective loci analysis\n\n";
-       if(q_qt) cout << "Quantitative trait\n\n";
+       if(q_qt){
+         cout << "Quantitative trait\n\n";
+         if(q_covar0) cout << "Covariate-only analysis\n\n";
+       }
      }
      if(!q_ee && !q_mf && !q_lr) q_pl=true;   // default
      if(q_ee+q_mf+q_lr+q_pl!=1){
