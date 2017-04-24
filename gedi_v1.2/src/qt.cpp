@@ -377,14 +377,19 @@ bool qtlr_assoc(const vector<short> &ak,const vector<double> &yk,int &nind,doubl
     }
     gsl_matrix *A=gsl_matrix_alloc(ndim,nind);  // design matrix=X^t (ndim x nind)
     gsl_matrix *H=gsl_matrix_alloc(ndim,nind);
+    int a0=0;
+    bool flag=true;
     for(int k=0;k<nind;k++){
       int a=ak[k];
       a=code(a,model);
+      if(k==0) a0=a;
+      else if(a!=a0) flag=false;
       gsl_matrix_set(A,0,k,1);       // intercept
       gsl_matrix_set(A,1,k,a);       // genotype
       for(int m=0;m<ncovar;m++)
         gsl_matrix_set(A,m+2,k,cov2[k][m]);  // covariates
     }
+    if(flag) return false;           // no variation in genotypes
     vector<double> beta(ndim);
 
     gsl_matrix *C=gsl_matrix_alloc(ndim,ndim);
