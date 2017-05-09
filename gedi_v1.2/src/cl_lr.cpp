@@ -205,8 +205,8 @@ double cl_min(const vector<string> &rs,const vector<vector<vector<bool> > > &ai,
   }while(status==GSL_CONTINUE && iter< Imax);
 
   if(iter==Imax){
-    cerr << "BFGS2 iteraction failed to converge after " << Imax << "iterations\n";
-    exit(1);
+    if(master) cerr << "BFGS2 iteraction failed to converge after " << Imax << "iterations\n";
+    end();
   }
 
   m=0;

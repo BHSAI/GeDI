@@ -13,6 +13,7 @@
 #include <gsl/gsl_multimin.h>
 #include "gedi.h"
 
+extern bool master;
 extern Model model;
 extern int L;                     // model multiplicity=(1,2) for (DOM/REC,GEN)
 extern std::string Mname[3];

@@ -1604,8 +1604,8 @@ void pr_tped(string &tped,string &tfam,string &meta_file,string &par_file,string
 
    bool comp(vector<double>a,vector<double> b);
    sort(risk.begin(),risk.end(),comp);
-   void roc(ofstream &ocv,vector<vector<double> > &risk);
-   roc(ocv,risk);
+// void roc(ofstream &ocv,vector<vector<double> > &risk);
+   roc(ocv,risk,0);
    if(master) ocv.close();
 }
 
@@ -1885,8 +1885,8 @@ void il_bpr(string &meta_file,string &out_file,string &par_file,bool q_lr){
 
   bool comp(vector<double>a,vector<double> b);
   sort(risk.begin(),risk.end(),comp);
-  void roc(ofstream &ocv,vector<vector<double> > &risk);
-  roc(ocv,risk);
+//void roc(ofstream &ocv,vector<vector<double> > &risk);
+  roc(ocv,risk,0);
   if(master) ocv.close();
 }
 

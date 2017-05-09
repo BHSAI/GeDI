@@ -717,7 +717,7 @@ double qt_pl(bool q_null,int i0,const vector<vector<bool> > &ai,const vector<dou
 //  return 0;
   }
   if(iter==Imax){
-    cerr << "BFGS2 iteration failed to converge after " << Imax << " iteration\n";
+    if(master) cerr << "BFGS2 iteration failed to converge after " << Imax << " iteration\n";
     q_crash=true;
 //  end();
 //  return false;

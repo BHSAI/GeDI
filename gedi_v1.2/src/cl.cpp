@@ -81,6 +81,7 @@ const int Nb=32;         // block size for parallel MF (ScaLAPACK)
 #endif
 const double Dy=0.1;    // integration grid size for trapezoidal rule
 const double Tol=1e-10;  // tolerance for covariate check
+const double Integ=5;
 
 struct Pares{            // bundles of parameters for minimization
   const vector<vector<vector<bool> > > &ai;
@@ -292,14 +293,13 @@ struct Pari{
   const vector<vector<int> > &cov_ds;
 };
 
-
-double pray(double y,void *params){   // returns Pr(ai,ci|y)*Pr(y)*sqrt(2pi)*sigma for arbitrary y
+double prae(double y,void *params){   // returns the exponent of integrand
 
   Pari *par=(Pari *)params;
   int nsnp=(par->ai).size()/2;
   if(q_covar0) nsnp=0;
 
-  double f=1;
+  double e=0;
   for(int i=0;i<nsnp;i++){
     vector<double> eh(L);
     double hmax=0;
@@ -316,16 +316,75 @@ double pray(double y,void *params){   // returns Pr(ai,ci|y)*Pr(y)*sqrt(2pi)*sig
       if(eh[l]>hmax) hmax=eh[l];
     }
     double z=exp(-hmax);
-    for(int l=0;l<L;l++)
+    for(int l=0;l<L;l++){
       z+=exp(eh[l]-hmax);
+    }
+    double x=-hmax-log(z);
     int a=2*(par->ai)[2*i]+(par->ai)[2*i+1];
     int ia=code(a,model);
-    if(ia>0)
-      f*=exp(eh[ia-1]-hmax)/z;
-    else
-      f*=exp(-hmax)/z;
+    if(ia>0) x+=eh[ia-1];
+    e+=x;
   }
-  f*=exp(-y*y/2.0);
+  e-=y*y/2.0;
+  if(q_covar){
+    int ncovar=(par->covar).size();
+    double sum=0;
+    double pr=1.0;
+    for(int m=0;m<ncovar;m++){
+      if((par->cov_ds)[m].size()==2){             // discrete covariates for DDA
+        int cmin=(par->cov_ds)[m][0];
+        int cmax=(par->cov_ds)[m][1];
+        double ex=(par->bcov0)[m]+y*(par->bcov1)[m];
+        double z=0;
+        for(int cp=cmin;cp<=cmax;cp++) z+=exp(cp*ex);
+        pr*=exp((par->covar)[m]*ex)/z;
+      }
+      else{                    
+        double c=(par->covar)[m]-(par->bcov0)[m]-y*(par->bcov1)[m];
+        sum+=c*c/(par->cvar)[m];
+      }
+    }
+    e+=log(pr)-sum/2.0;
+  }
+
+  return e;
+}
+
+double pray(double y,void *params,double emax){  
+  // returns Pr(ai,ci|y)*Pr(y)*sqrt(2pi)*sigma for arbitrary y
+
+  Pari *par=(Pari *)params;
+  int nsnp=(par->ai).size()/2;
+  if(q_covar0) nsnp=0;
+
+  double f=1;
+  double e=0;
+  for(int i=0;i<nsnp;i++){
+    vector<double> eh(L);
+    double hmax=0;
+    for(int l=0;l<L;l++){
+      eh[l]=(par->h0)[i][l]+y*(par->h1)[i][l];
+      if(!q_qtil){
+        for(int j=i+1;j<nsnp;j++){
+          int b=2*(par->ai)[2*j]+(par->ai)[2*j+1];
+          int jb=code(b,model);
+          if(jb==0) continue;
+          eh[l]+=(par->J0)[i][j][2*l+jb-1]+y*(par->J1)[i][j][2*l+jb-1];
+        }
+      }
+      if(eh[l]>hmax) hmax=eh[l];
+    }
+    double z=exp(-hmax);
+    for(int l=0;l<L;l++){
+      z+=exp(eh[l]-hmax);
+    }
+    double x=-hmax-log(z);
+    int a=2*(par->ai)[2*i]+(par->ai)[2*i+1];
+    int ia=code(a,model);
+    if(ia>0) x+=eh[ia-1];
+    e+=x;
+  }
+  f=exp(e-y*y/2.0-emax);
   if(q_covar){
     int ncovar=(par->covar).size();
     double sum=0;
@@ -354,13 +413,13 @@ double pray(double y,void *params){   // returns Pr(ai,ci|y)*Pr(y)*sqrt(2pi)*sig
 }
 
 // trapezoidal rule
-double trapez(void *param,double y0,double y1){
+/*double trapez(void *param,double y0,double y1,double emax){
 
-  double pray(double y,void *param);
+  double pray(double y,void *param,double emax);
   double sum=0;
   int nk=(y1-y0)/Dy;
   for(int k=0;k<=nk;k++){
-    double f=pray(y0+k*Dy,param);
+    double f=pray(y0+k*Dy,param,emax);
     if(k==0 || k==nk)
       sum+=f;
     else
@@ -370,18 +429,14 @@ double trapez(void *param,double y0,double y1){
   sum*=(y1-y0)/2/nk;
   return sum;
 }
+*/
 
 void pr_cl_qt(ofstream &of,const vector<vector<vector<vector<bool> > > > &ai,
     const vector<vector<double> > &yk,Theta_qt &th_qt,vector<vector<double> > &risk,
     const vector<vector<vector<double> > > &covar,const vector<vector<vector<int> > > &cov_ds){
 
-//gsl_integration_workspace *w=gsl_integration_workspace_alloc(1000);
-//gsl_function F;
-//F.function=&pray;
-//double err;
-
   int nsample=ai.size();
-  double norm,mean;
+  double pray(double y,void *param,double emax);
 
   for(int s=0;s<nsample;s++){
     int nind=int(ai[s][0].size());
@@ -395,19 +450,35 @@ void pr_cl_qt(ofstream &of,const vector<vector<vector<vector<bool> > > > &ai,
       Pari par={0,ai[s][0][n],th_qt.h[0],th_qt.h[1],th_qt.J[0],th_qt.J[1],tmp,th_qt.bcov0,
         th_qt.bcov1,th_qt.cvar,tmp2};
       void *param=(void *)&par;
-//    F.params=param;
-//    ofstream pdf;
-//    pdf.open("pdf.dat",ios::out);
-//    for(double y=-5;y<5;y+=0.1)
-//      pdf << y << " " << pray(y,param) << endl;
-//    pdf.close();
-//    gsl_integration_qagi(&F,0,1e-2,1000,w,&norm,&err);
-//    gsl_integration_qags(&F,-10,10,0,1e-7,1000,w,&norm,&err);
-      norm=trapez(param,-10,10);
-      par.expo=1;
-//    gsl_integration_qagi(&F,0,1e-2,1000,w,&mean,&err);
-//    gsl_integration_qags(&F,-10,10,0,1e-7,1000,w,&mean,&err);
-      mean=trapez(param,-10,10);
+      vector<double> expo;
+      int nk=(2*Integ)/Dy;
+      double e=prae(-Integ,param);
+      expo.push_back(e);
+      double emean=e;
+      for(int k=1;k<=nk;k++){    // find the exponent maximim
+        double e=prae(-Integ+k*Dy,param);
+        expo.push_back(e);
+        emean+=e;
+      }
+      emean/=nk+1;
+      double mean=0;
+      double norm=0;
+      double y0=-Integ;
+      double y1=Integ;
+      for(int k=0;k<=nk;k++){    // trapezoidal rule
+        double f=exp(expo[k]-emean);
+        double y=-Integ+k*Dy;
+        if(k==0 || k==nk){
+          norm+=f;
+          mean+=f*y;
+        }
+        else{
+          norm+=2*f;
+          mean+=2*f*y;
+        }
+      }
+      norm*=(y1-y0)/2/nk;
+      mean*=(y1-y0)/2/nk;
       mean/=norm;
       double mean2=mean*qt_ysd[s]+qt_yav[s];
       double y=yk[s][n]*qt_ysd[s]+qt_yav[s];
@@ -1152,8 +1223,11 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
   else
     para=lambda;
 
+  int ncovar=0;
+  if(q_covar) ncovar=covar[0][0].size();
+
   bool comp(vector<double> a,vector<double> b);
-  void roc(ofstream &ocv,vector<vector<double> > &risk);
+//void roc(ofstream &ocv,vector<vector<double> > &risk);
 //vector<vector<vector<double> > >  covar2;
 //vector<vector<vector<int> > >  cov_ds2;
   if(q_pr){         // prediction mode
@@ -1170,7 +1244,7 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
       else
         pr_cl(of,av,th,risk);                // do prediction
       sort(risk.begin(),risk.end(),comp);
-      roc(ocv,risk);
+      roc(ocv,risk,ncovar);
     }
     else{
       for(unsigned int k=0;k<para.size();k++){
@@ -1274,7 +1348,7 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
           }
         }
         sort(risk.begin(),risk.end(),comp);
-        roc(ocv,risk);
+        roc(ocv,risk,ncovar);
       }
     }
     ocv.close();
@@ -1320,7 +1394,7 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
       else
         pr_cl_qtlr(dummy,aw,ykw,th,risk,covar);
     }
-    if(q_qt) roc(ocv,risk);
+    if(q_qt) roc(ocv,risk,ncovar);
   }
   if(master) of.close();
 }
@@ -1424,7 +1498,7 @@ bool comp(vector<double> a,vector<double> b){ return a[0]>b[0]; }
 // select significant snps based on training set
 
 // calculats receiver operating characterisic and its area under curve (or correlation for qt)
-void roc(ofstream &ocv,vector<vector<double> > &risk){
+void roc(ofstream &ocv,vector<vector<double> > &risk,int ncovar){
 
     double n0=0;
     double n1=0;
@@ -1478,6 +1552,7 @@ void roc(ofstream &ocv,vector<vector<double> > &risk){
         double f=0.5*log((1+r)/(1-r));  // Fisher transformation
         double f0=0.5*log((1+corr0)/(1-corr0)); 
         double z=sqrt(ntot-3.0)*(f-f0);
+//      double z=sqrt(ntot-ncovar-3.0)*(f-f0);
         double p=gsl_cdf_ugaussian_Q(z);
         if(master){
          cout << "P(R0 = " << corr0 << ") = " << p << endl;
@@ -2621,7 +2696,7 @@ double lpr_psl(int i0,int cc,const vector<vector<vector<bool> > > &ai,
     }
   }while(status==GSL_CONTINUE && iter< Imax);
   if(iter==Imax){
-    cerr << "BFGS2 iteration failed to converge after " << Imax << " iterations\n";
+    if(master) cerr << "BFGS2 iteration failed to converge after " << Imax << " iterations\n";
     if(q_strict) end();
   }
 

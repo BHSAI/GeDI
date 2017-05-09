@@ -99,7 +99,7 @@ int main(int argc,char* argv[]){
   if(master){
     cout << endl;
     cout << "-----------------------------------------------------------------" << endl;
-    cout << "  GeDI v1.0                                                      " << endl;
+    cout << "  GeDI v1.2                                                      " << endl;
     cout << "-----------------------------------------------------------------" << endl;
     cout << "                                                                 " << endl;
     cout << "  Genotype distribution-based inference of disease association   " << endl;
