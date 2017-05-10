@@ -631,7 +631,7 @@ void bin_read(string &meta,int &nsample,vector<vector<int> > &nptr,
     if(master) cout << endl;
   }
 
-  int nind[2]={0,};
+  int nsum[2]={0,};
   nptr.resize(nsample+1);
   vector<vector<short> > phe(nsample);
   if(q_qt){
@@ -647,9 +647,12 @@ void bin_read(string &meta,int &nsample,vector<vector<int> > &nptr,
   double yav=0;
   double var=0;
   for(int s=0;s<nsample;s++){
+    int nind[2]={0,};
     int ymax=(q_qt ? 1 : 2);
-    for(int y=0;y<ymax;y++)
+    for(int y=0;y<ymax;y++){
       nind[y]+=nptr[s+1][y]-nptr[s][y];
+      nsum[y]+=nind[y];
+    }
     if(!q_qt) continue;
     for(int n=0;n<nind[0];n++){
       double yki=yk[s][n];
@@ -663,9 +666,8 @@ void bin_read(string &meta,int &nsample,vector<vector<int> > &nptr,
     qt_yav[s]=yav;
     qt_ysd[s]=sd;
   }
-  int ntot=nind[0]+nind[1];
-  ai[0].resize(nind[0]);
-  if(!q_qt) ai[1].resize(nind[1]);
+  ai[0].resize(nsum[0]);
+  if(!q_qt) ai[1].resize(nsum[1]);
 
   if(q_boot){   // phenotype permutation
     for(int s=0;s<nsample;s++){
@@ -848,10 +850,10 @@ void bin_read(string &meta,int &nsample,vector<vector<int> > &nptr,
             gi1+=(bit[m-2] ? a1[i] : a0[i]);
           }
           ind++;
-          if(ind==ntot) break;
+          if(ind==nsize) break;
           m-=2;
         }
-        if(ind==ntot) break;
+        if(ind==nsize) break;
       }
       delete[] data;
 
@@ -895,9 +897,9 @@ void bin_read(string &meta,int &nsample,vector<vector<int> > &nptr,
 
   if(master){
     if(!q_qt)
-      cout << "No. of individuals: " << nind[1] << " (case) + " << nind[0] << " (control)\n";
+      cout << "No. of individuals: " << nsum[1] << " (case) + " << nsum[0] << " (control)\n";
     else
-      cout << "No. of individuals: " << nind[0] << endl;
+      cout << "No. of individuals: " << nsum[0] << endl;
     cout << endl;
     cout << nsnp << " SNPs read\n\n";
   }
@@ -926,6 +928,7 @@ void tped_read(string &tped,string &tfam,string &meta,string &par,int &nsample,
   vector<string> mtped;
   vector<string> mtfam;
   vector<string> mtcov;
+
 
   if(!q_meta){
     mtped.push_back(tped);
@@ -962,7 +965,6 @@ void tped_read(string &tped,string &tfam,string &meta,string &par,int &nsample,
     if(master) cout << endl;
   }
 
-  int nind[2]={0,};
   nptr.resize(nsample+1);    // 1st indices for each sample; nptr[s][y]
   vector<vector<short> > phe(nsample);
   if(q_qt){
@@ -975,10 +977,14 @@ void tped_read(string &tped,string &tfam,string &meta,string &par,int &nsample,
   read_pheno(mtfam,nptr,fid,iid,phe,yk);  // read phenotypes
   double yav=0;
   double var=0;
+  int nsum[2]={0,};   // sum over samples 
   for(int s=0;s<nsample;s++){
+    int nind[2]={0,};
     int ymax=(q_qt ? 1 : 2);
-    for(int y=0;y<ymax;y++)
+    for(int y=0;y<ymax;y++){
       nind[y]+=nptr[s+1][y]-nptr[s][y];
+      nsum[y]+=nind[y];
+    }
     if(!q_qt) continue;
     for(int n=0;n<nind[0];n++){           // standardize yk
       double yki=yk[s][n];
@@ -995,7 +1001,9 @@ void tped_read(string &tped,string &tfam,string &meta,string &par,int &nsample,
 
   if(q_boot){   // phenotype permutation
     for(int s=0;s<nsample;s++){
+      int nind[2]={0,};
       if(!q_qt){
+        for(int y=0;y<2;y++) nind[y]+=nptr[s+1][y]-nptr[s][y];
         int ntot=nind[0]+nind[1];
         vector<int> n1(nind[1]);
         sample(ntot,nind[1],n1);
@@ -1026,8 +1034,8 @@ void tped_read(string &tped,string &tfam,string &meta,string &par,int &nsample,
   int nsnp=0;
   vector<string> rsn(nsample);
   long pos;
-  ai[0].resize(nind[0]);
-  ai[1].resize(nind[1]);
+  ai[0].resize(nsum[0]);
+  if(!q_qt) ai[1].resize(nsum[1]);
 
   if(master && !q_qt){
     if(q_minor_ctl) cout << "Minor alleles defined with respect to control group\n\n";
@@ -1157,9 +1165,9 @@ void tped_read(string &tped,string &tfam,string &meta,string &par,int &nsample,
 
   if(master){
     if(!q_qt)
-      cout << "No. of individuals: " << nind[1] << " (case) + " << nind[0] << " (control)\n";
+      cout << "No. of individuals: " << nsum[1] << " (case) + " << nsum[0] << " (control)\n";
     else
-      cout << "No. of individuals: " << nind[0] << endl;
+      cout << "No. of individuals: " << nsum[0] << endl;
    cout << endl;
    cout << nsnp << " SNPs read from ";
     for(int s=0;s<nsample;s++){
