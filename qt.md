@@ -11,7 +11,7 @@ The program will read file.fam (or file.tfam) file, where the last column (1 or 
 
     $ gedi -qt -cl -lr --bfile file --ld 0.1 1 10
     
-In this case, the inference becomes ridge regression (penalized linear regression). After each inference, the variance explained (R2 = corelation between fitted and actual phenotypes squared) will be printed. The --pcut 1 option dictates all SNPs to be included. Otherwise, the linear regression IL p-value will be used to select SNPs for CL.
+In this case, the inference becomes ridge regression (penalized linear regression). After each inference, the variance explained (R = corelation between fitted and actual phenotypes) will be printed. The p-value printed is for the null hypothesis of no association, calculated by the t-distribution assuming that phenotype values are normally distributed. The --pcut 1 option dictates all SNPs to be included. Otherwise, the linear regression IL p-value will be used to select SNPs for CL.
 
 Cross-validation is performed as in case-control data with the flag -pr:
         
