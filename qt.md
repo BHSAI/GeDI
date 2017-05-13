@@ -17,7 +17,7 @@ Cross-validation is performed as in case-control data with the flag -pr:
         
     $ gedi -qt -cl --bfile file --ld 0.1 1 10 -pr --pcut 1
     
-Under cross-validation, the R2 becomes the squared correlation between predicted and actual phenotypes for test sets, while inference is performed based on training sets only. The R2 is therefore analogous to AUC of case-control inferences and can be maximized with respect to penalizer.
+Under cross-validation, the R^2 becomes the squared correlation between predicted and actual phenotypes for test sets, while inference is performed based on training sets only. The (signed) R is analogous to AUC of case-control inferences and can be maximized with respect to penalizer.
     
     
 
