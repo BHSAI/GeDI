@@ -440,7 +440,20 @@ void pr_cl_qt(ofstream &of,const vector<vector<vector<vector<bool> > > > &ai,
 
   for(int s=0;s<nsample;s++){
     int nind=int(ai[s][0].size());
-    for(int n=0;n<nind;n++){
+    int iind=ceil(double(nind)/nproc);   // individuals per processor
+    int nstart=rank*iind;
+    int nstop=(rank+1)*iind;
+    if(nstart>nind) nstart=nind;
+    if(nstop>nind) nstop=nind;
+    int ndata=iind;                      // number of data items per processor
+    double *data=new double[ndata];      // package for each proc
+#ifdef MPIP
+    double *data0=new double[ndata*nproc];     // received data for master
+#endif
+    for(int n=0;n<ndata;n++) data[n]=0;
+
+    int idata=0;
+    for(int n=nstart;n<nstop;n++){
       vector<double> tmp;
       vector<vector<int> > tmp2;
       if(q_covar){
@@ -480,12 +493,37 @@ void pr_cl_qt(ofstream &of,const vector<vector<vector<vector<bool> > > > &ai,
       norm*=(y1-y0)/2/nk;
       mean*=(y1-y0)/2/nk;
       mean/=norm;
-      double mean2=mean*qt_ysd[s]+qt_yav[s];
+      data[idata++]=mean;
+    }
+#ifdef MPIP
+    MPI_Allgather(data,ndata,MPI_DOUBLE,data0,ndata,MPI_DOUBLE,MPI_COMM_WORLD);
+#endif
+
+    vector<double> yp(nind);
+    idata=0;
+    for(int k=0;k<nproc;k++){
+      for(int n=k*iind;n<(k+1)*iind;n++){
+        if(n>=nind) break;
+#ifdef MPIP
+        yp[n]=data0[idata++];
+#else
+        yp[n]=data[idata++];
+#endif
+      }
+      if(idata>=ndata*nproc) break;
+    }
+    delete[] data;
+#ifdef MPIP
+    delete[] data0;
+#endif
+        
+    vector<double> dummy(2);
+    for(int n=0;n<nind;n++){
+      double mean2=yp[n]*qt_ysd[s]+qt_yav[s];
       double y=yk[s][n]*qt_ysd[s]+qt_yav[s];
-      if(of.is_open())
+      if(master && of.is_open())
         of << setw(13) << left << mean2 << " " << y << endl;
-      vector<double> dummy(2);
-      dummy[0]=mean;
+      dummy[0]=yp[n];
       dummy[1]=yk[s][n];
       risk.push_back(dummy);
     }
@@ -1759,6 +1797,7 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,const vector<vec
   q_crash=false;
 
   int nsnp=ai[0][0][0].size()/2;
+  int npr2=nsnp/10;
   if(q_covar0) nsnp=0;
   int nsample=nptr.size()-1;   // no. of samples
   vector<vector<vector<vector<double> > > > f1(nsample);   // empirical frequencies of minor alleles
@@ -1915,7 +1954,7 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,const vector<vec
         }
         lks+=lki;
         qtos+=q;
-        if((i+1)%Npr2==0) cout << "Inference for SNP #" << i+1 << "...\n";
+        if((i+1)%npr2==0) cout << "Inference for SNP #" << i+1 << "...\n";
 //      if(q_crash) cout << "Inference for SNP #" << i+1 << " failed\n";
       }
 #ifdef MPIP
