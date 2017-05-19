@@ -51,7 +51,7 @@ void infer_par(int nv,const vector<vector<vector<bool> > > &ai,double &alpha,
 void read_bfm(vector<string> &mbfile,const string& meta,int nind[2],vector<vector<int> > &nptr,
     vector<vector<short> > &phe,vector<vector<string> > &fid,vector<vector<string> > &iid,
     vector<char> &a0,vector<char> &a1,vector<int> &nchr,
-    vector<long> &pos,vector<string> &rs,vector<vector<double> > &yk){   
+    vector<long> &pos,vector<string> &rs,vector<vector<double> > &yk,vector<vector<short> > &sex){   
 
   int nsample=0;  // number of samples;
   if(!q_metab){
@@ -80,6 +80,7 @@ void read_bfm(vector<string> &mbfile,const string& meta,int nind[2],vector<vecto
 
   nptr.resize(nsample+1);          // 1st indices for each sample; nptr[s][y]
   phe.resize(nsample);
+  sex.resize(nsample);
   if(q_qt) yk.resize(nsample);
 
   // read fam files
@@ -87,7 +88,7 @@ void read_bfm(vector<string> &mbfile,const string& meta,int nind[2],vector<vecto
   for(int s=0;s<nsample;s++) ffile[s]=mbfile[s]+".fam";
   fid.resize(nsample);
   iid.resize(nsample);
-  read_pheno(ffile,nptr,fid,iid,phe,yk);
+  read_pheno(ffile,nptr,fid,iid,phe,yk,sex);
   nind[0]=nind[1]=0;
   for(int s=0;s<nsample;s++){
     int ymax=(q_qt ? 1 : 2);
@@ -184,8 +185,9 @@ void il_bed(string &meta,string &out_file,bool q_lr){
   vector<vector<double> > yk; // quantitative phenotypes
   vector<vector<string> > fid;
   vector<vector<string> > iid;
+  vector<vector<short> > sex;
 
-  read_bfm(mbfile,meta,nind,nptr,phe,fid,iid,a0,a1,nchr,pos,rs,yk);  // read bim fam files
+  read_bfm(mbfile,meta,nind,nptr,phe,fid,iid,a0,a1,nchr,pos,rs,yk,sex);  // read bim fam files
   int nsample=mbfile.size();   // no. of samples
   int ntot=nind[0]+nind[1];
   if(master) cout << "No. of individuals = " << ntot << endl << endl;
@@ -328,6 +330,7 @@ void il_bed(string &meta,string &out_file,bool q_lr){
         ak.resize(nsize);
         for(int n=0;n<nsize;n++){
           int a=(gi0.at(n)==minor)+(gi1.at(n)==minor);
+          if(a==2 && nchr[i]==23 && sex[s][n]==0) a=1;  // male X-chr
           if(a>0)
             fry[a-1]+=yk[s][n];
           ak[n]=a;
@@ -380,6 +383,7 @@ void il_bed(string &meta,string &out_file,bool q_lr){
              int cnt=0;
              if(gi0.at(n)==minor) cnt++;
              if(gi1.at(n)==minor) cnt++;
+             if(cnt==2 && nchr[i]==23 && sex[s][n]==0) cnt=1;  // male X-chr
              ani[y][nc[y]++]=cnt;
            }
            nna=il_dlr(q,alp,bet,ani); 
@@ -479,8 +483,8 @@ void il_tped(string &tped,string &tfam,string &meta_file,string &out_file,bool q
    vector<vector<double> > yk(nsample);
    vector<vector<string> > fid(nsample); 
    vector<vector<string> > iid(nsample); 
-
-   read_pheno(mtfam,nptr,fid,iid,phe,yk);
+   vector<vector<short> > sex(nsample);
+   read_pheno(mtfam,nptr,fid,iid,phe,yk,sex);
 
 // int ntot=nind[0]+nind[1];
    if(q_boot){                        // permutation
@@ -549,7 +553,7 @@ void il_tped(string &tped,string &tfam,string &meta_file,string &out_file,bool q
    for(int s=0;s<nsample;s++){
      f0[s].open(mtped[s].c_str(),ios::in);
      if(!f0[s].is_open()){
-       cerr << "File " << mtped[s] << " cannot be opened." << endl;
+       if(master) cerr << "File " << mtped[s] << " cannot be opened." << endl;
        exit(1);
      }
    }
@@ -1379,8 +1383,9 @@ void pr_tped(string &tped,string &tfam,string &meta_file,string &par_file,string
    vector<vector<string> > fid(nsample);
    vector<vector<string> > iid(nsample);
    vector<vector<double> > yk(nsample);
+   vector<vector<short> > sex(nsample);
 
-   read_pheno(mtfam,nptr,fid,iid,phe,yk);
+   read_pheno(mtfam,nptr,fid,iid,phe,yk,sex);
 
    if(q_boot){                             // permutation
      if(q_qt){
@@ -1514,7 +1519,10 @@ void pr_tped(string &tped,string &tfam,string &meta_file,string &par_file,string
            bool b0=false; 
            bool b1=false;
            if(cnt==1) b1=true;
-           if(cnt==2) b0=true;
+           if(cnt==2){
+             if(nchr==23 && sex[s][n]==0) b1=true; // male X-chr -> cnt=2 -> 1
+             else b0=true;
+           }
            ai[y][nptr[s][y]+nc[y]].push_back(b0);
            ai[y][nptr[s][y]+nc[y]].push_back(b1);
          }
@@ -1611,7 +1619,7 @@ void pr_tped(string &tped,string &tfam,string &meta_file,string &par_file,string
 
 void read_pheno(const vector<string> &mtfam,vector<vector<int> > &nptr,
    vector<vector<string> > &fid,vector<vector<string> > &iid,vector<vector<short> > &phe,
-   vector<vector<double> > &yk){
+   vector<vector<double> > &yk,vector<vector<short> > &sex){
 
    int nsample=phe.size();
    int nind[2]={0,};
@@ -1630,11 +1638,19 @@ void read_pheno(const vector<string> &mtfam,vector<vector<int> > &nptr,
        istringstream iss(line);
        string tmp;
        int y;
-       iss >> tmp; 
+       iss >> tmp; // FID
        fid[s].push_back(tmp);
-       iss >> tmp;
+       iss >> tmp; // IID
        iid[s].push_back(tmp);
-       for(int i=0;i<3;i++) iss >> tmp;
+       for(int i=0;i<2;i++) iss >> tmp;
+       int mf=0;
+       iss >> mf; mf--;
+       if(mf!=0 && mf!=1){
+         if(master) cerr << "Unknown sex in tfam file " << mtfam[s] << endl;
+         end();
+       }
+       sex[s].push_back(mf);
+
        if(!q_qt){
          iss >> y; y--;
          if(y<0 || y>1){
@@ -1673,8 +1689,9 @@ void il_bpr(string &meta_file,string &out_file,string &par_file,bool q_lr){
   vector<vector<double> > yk; // qt
   vector<vector<string> > fid;
   vector<vector<string> > iid;
+  vector<vector<short> > sex;
 
-  read_bfm(mbfile,meta_file,nind,nptr,phe,fid,iid,a0,a1,nchr,pos,rs,yk);  // read bim fam files
+  read_bfm(mbfile,meta_file,nind,nptr,phe,fid,iid,a0,a1,nchr,pos,rs,yk,sex);  // read bim fam files
   int nsample=mbfile.size();   // no. of samples
   int nsnp=a0.size();
   if(q_boot){
@@ -1812,7 +1829,10 @@ void il_bpr(string &meta_file,string &out_file,string &par_file,bool q_lr){
           bool b0=false;
           bool b1=false;
           if(cnt==1) b1=true;
-          if(cnt==2) b0=true;
+          if(cnt==2){
+            if(nchr[i]==23 && sex[s][n]==0) b1=true;
+            else b0=true;
+          }
           ai[y][k][2*i]=b0;
           ai[y][k][2*i+1]=b1;
         }

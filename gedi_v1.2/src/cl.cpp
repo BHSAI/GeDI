@@ -672,6 +672,7 @@ void bin_read(string &meta,int &nsample,vector<vector<int> > &nptr,
   int nsum[2]={0,};
   nptr.resize(nsample+1);
   vector<vector<short> > phe(nsample);
+  vector<vector<short> > sex(nsample);  // (0,1)=(M,F)
   if(q_qt){
     yk.resize(nsample);
     qt_yav.resize(nsample);
@@ -681,7 +682,7 @@ void bin_read(string &meta,int &nsample,vector<vector<int> > &nptr,
   vector<vector<string> > iid(nsample);
   vector<string> fl(nsample);
   for(int s=0;s<nsample;s++) fl[s]=mbfile[s]+".fam";
-  read_pheno(fl,nptr,fid,iid,phe,yk);       // read phenotypes
+  read_pheno(fl,nptr,fid,iid,phe,yk,sex);       // read phenotypes
   double yav=0;
   double var=0;
   for(int s=0;s<nsample;s++){
@@ -742,8 +743,9 @@ void bin_read(string &meta,int &nsample,vector<vector<int> > &nptr,
   }
 
   // read bim files
-  vector<char>a0;  // 1st allele  ( need to be the same over samples!)
-  vector<char>a1;  // 2nd allele
+  vector<char> a0;  // 1st allele  ( need to be the same over samples!)
+  vector<char> a1;  // 2nd allele
+  vector<int>  chr; // chromosome (23 = X-chr)
 
   int nsnp=0;
   vector<int>pos;
@@ -809,6 +811,7 @@ void bin_read(string &meta,int &nsample,vector<vector<int> > &nptr,
         end();
         }
       }
+      chr.push_back(nchr);
       nsnp2++;
     }
     if(s==0) nsnp=nsnp2;
@@ -912,8 +915,11 @@ void bin_read(string &meta,int &nsample,vector<vector<int> > &nptr,
           int cnt=0;
           if(gi0.at(n)==minor) cnt++;
           if(gi1.at(n)==minor) cnt++;
-          if(cnt==1) b1=true;
-          if(cnt==2) b0=true; 
+          if(cnt==1) b1=true;              // (b0,b1)=(0,1); heterozygous
+          if(cnt==2){                      
+            if(chr[i]==23 && sex[s][n]==0) b1=true;   // male X-chr -> cnt=2 -> 1  
+            else b0=true;                  // (b0,b1)=(1,0); homozygous
+          }
         }
         aip[n][0]=b0;
         aip[n][1]=b1;
@@ -1012,7 +1018,8 @@ void tped_read(string &tped,string &tfam,string &meta,string &par,int &nsample,
   }
   vector<vector<string> > fid(nsample);
   vector<vector<string> > iid(nsample);
-  read_pheno(mtfam,nptr,fid,iid,phe,yk);  // read phenotypes
+  vector<vector<short> > sex(nsample);    // (0,1)=(M,F)
+  read_pheno(mtfam,nptr,fid,iid,phe,yk,sex);  // read phenotypes
   double yav=0;
   double var=0;
   int nsum[2]={0,};   // sum over samples 
@@ -1174,7 +1181,10 @@ void tped_read(string &tped,string &tfam,string &meta,string &par,int &nsample,
           if(gi0.at(n)==minor) cnt++;
           if(gi1.at(n)==minor) cnt++;
           if(cnt==1) b1=true;
-          if(cnt==2) b0=true; 
+          if(cnt==2){
+            if(nchr==23 && sex[s][n]==0) b1=true; // male X-chr
+            else b0=true;
+          }
         }
         aip[n][0]=b0;
         aip[n][1]=b1;
@@ -1298,8 +1308,8 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
         risk.resize(0);
         double s=0;
         double lnp=0;
-//      if(q_qt && q_lr) Lh=para[k];
-        if(q_qt || q_Lh) Lh=para[k];
+        if(q_qt && q_lr) Lh=para[k];
+        if(q_qt && !q_Lh) Lh=para[k];
         for(int nv=0;nv<ncv;nv++){
           if(master){
             if(q_mf)
@@ -1420,8 +1430,8 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
   ofstream dummy;
   for(unsigned int k=0;k<para.size();k++){
     risk.resize(0);
-//  if(q_qt && q_lr) Lh=para[k];
-    if(q_qt || q_Lh) Lh=para[k];
+    if(q_qt && q_lr) Lh=para[k];
+    if(q_qt && !q_Lh) Lh=para[k];
 //  if(q_ee || q_mf || q_pl)
     bool q_crash=false;
     if(!q_lr)
@@ -1797,7 +1807,7 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,const vector<vec
   q_crash=false;
 
   int nsnp=ai[0][0][0].size()/2;
-  int npr2=nsnp/10;
+  int npr2=(nsnp<=10 ? 1 : nsnp/10);
   if(q_covar0) nsnp=0;
   int nsample=nptr.size()-1;   // no. of samples
   vector<vector<vector<vector<double> > > > f1(nsample);   // empirical frequencies of minor alleles

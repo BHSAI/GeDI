@@ -308,8 +308,10 @@ int main(int argc,char* argv[]){
        else if(flag=="cvrout"){ // covar parameter output
          cvrout=argv[i++];
        }
-       else if(flag=="lh")
+       else if(flag=="lh"){
          Lh=atof(argv[i++]);
+         q_Lh=true;
+       }
        else if(flag=="meta"){
          q_meta=true;
          meta_file=argv[i++]; // file list for meta analysis
