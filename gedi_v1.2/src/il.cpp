@@ -600,10 +600,14 @@ void il_tped(string &tped,string &tfam,string &meta_file,string &out_file,bool q
        iss >> posm; 
        iss >> pos;           // position
        char c;
+       int n=0;
        while(iss >> c){
          gi0+=c;             // 1st allele
          iss >> c;
-         gi1+=c;             // 2nd allele
+         if(nchr==23 && sex[s][n++]==0)   // male-X
+           gi1+='?';
+         else
+           gi1+=c;             // 2nd allele
        }
 //     unsigned int nsize=nptr[s+1][0]-nptr[s][0]+nptr[s+1][1]-nptr[s][1];
        unsigned int ncase=0;
