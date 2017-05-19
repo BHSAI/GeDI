@@ -55,7 +55,8 @@ bool qt_assoc(const std::vector<short> &ak,const std::vector<double> &yk,double 
 
 void read_pheno(const std::vector<std::string> &mtfam,std::vector<std::vector<int> > &nptr,
     std::vector<std::vector<std::string> > &fid,std::vector<std::vector<std::string> > &iid,
-    std::vector<std::vector<short> > &phe,std::vector<std::vector<double> > &yk);
+    std::vector<std::vector<short> > &phe,std::vector<std::vector<double> > &yk,
+    std::vector<std::vector<short> > &sex);
 
 void header(std::ofstream &of,int nind[2]);
 
@@ -188,7 +189,8 @@ void il_bpr(std::string &meta_file,std::string &out_file,std::string &par_file,b
 
 int c2i(char a);
 
-void read_bfm(std::vector<std::string> &mbfile,const std::string& meta,int nind[2],std::vector<std::vector<int> > &nptr, std::vector<std::vector<short> > &phe,std::vector<char> &a0,std::vector<char> &a1,std::vector<int> &nchr,std::vector<long> &pos,std::vector<std::string> &rs,std::vector<std::vector<double> > &yk);   
+void read_bfm(std::vector<std::string> &mbfile,const std::string& meta,int nind[2],std::vector<std::vector<int> > &nptr, std::vector<std::vector<short> > &phe,std::vector<char> &a0,std::vector<char> &a1,std::vector<int> &nchr,std::vector<long> &pos,std::vector<std::string> &rs,std::vector<std::vector<double> > &yk,
+    std::vector<std::vector<short> > &sex);   
 
 double qt_pl(bool q_null,int i0,const std::vector<std::vector<bool> > &ai,const std::vector<double> &yk,
     const std::vector<std::vector<std::vector<double> > > &f1,const std::vector<std::vector<std::vector<std::vector<float> > > > &f2,double lambda,std::vector<std::vector<std::vector<double> > > &h,std::vector<std::vector<std::vector<std::vector<float> > > > &J,bool &q_crash);
@@ -203,5 +205,7 @@ double dcovar(bool q_null,const std::vector<short> &ak,const std::vector<double>
     double h[2]);
 
 void chk_covar(std::vector<std::vector<double> > &covar,std::vector<std::vector<int> > &covar2);
+
+void roc(std::ofstream &ocv,std::vector<std::vector<double> > &risk,int ncovar);
 
 #endif
