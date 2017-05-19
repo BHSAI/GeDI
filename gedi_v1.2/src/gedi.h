@@ -47,7 +47,8 @@ void read_par(std::ifstream &prf,double &alpha,std::vector<double> &beta1, std::
     std::vector<double> &pf);
 
 void freq(int ntot,int nmiss[],const std::string &gi0,const std::string &gi1,
-    const std::vector<short> &phe,char &minor,char &major,char &rsk,double f1[2][2],int s);
+    const std::vector<short> &phe,char &minor,char &major,char &rsk,double f1[2][2],int s,
+    int nchr,const std::vector<short> &sex);
 
 bool assoc(double f1[2][2],int nind[2],double &q,double &alpha,double beta[]);
 

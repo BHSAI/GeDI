@@ -312,7 +312,11 @@ void il_bed(string &meta,string &out_file,bool q_lr){
           }
           else{
             gi0+=(bit[m-1] ? a1[i] : a0[i]);
-            gi1+=(bit[m-2] ? a1[i] : a0[i]);
+//          gi1+=(bit[m-2] ? a1[i] : a0[i]);
+            if(sex[s][ind]==0 && nchr[i]==23)
+              gi1+='?';
+            else
+              gi1+=(bit[m-2] ? a1[i] : a0[i]);
           }
           ind++;
           if(ind==nsize) break;
@@ -323,14 +327,14 @@ void il_bed(string &meta,string &out_file,bool q_lr){
       int nmiss[2]={0,};
       double fr1[2][2]={{0,}};
       double fry[2]={0,};    // y-weighted freq. for qt
-      freq(nsize,nmiss,gi0,gi1,phe[s],minor,major,rsk,fr1,s);  // if s==0, minor/major are set; otherwise 
+      freq(nsize,nmiss,gi0,gi1,phe[s],minor,major,rsk,fr1,s,nchr[i],sex[s]);  // if s==0, minor/major are set; otherwise 
                                                          // they are used and not changed
       vector<short> ak;
       if(q_qt){
         ak.resize(nsize);
         for(int n=0;n<nsize;n++){
           int a=(gi0.at(n)==minor)+(gi1.at(n)==minor);
-          if(a==2 && nchr[i]==23 && sex[s][n]==0) a=1;  // male X-chr
+//        if(a==2 && nchr[i]==23 && sex[s][n]==0) a=1;  // male X-chr
           if(a>0)
             fry[a-1]+=yk[s][n];
           ak[n]=a;
@@ -617,7 +621,7 @@ void il_tped(string &tped,string &tfam,string &meta_file,string &out_file,bool q
          end();
        }
        int nmiss[2]={0,};
-       freq(nsize,nmiss,gi0,gi1,phe[s],minor,major,rsk,f1,s);
+       freq(nsize,nmiss,gi0,gi1,phe[s],minor,major,rsk,f1,s,nchr,sex[s]);
        vector<short> ak;
        double fry[2]={0,};
        if(q_qt){
@@ -1022,7 +1026,7 @@ bool assoc(double f1[2][2],int nind[2],double &q,double &alpha,double beta[]){
 
 // calculates genotype frequencies at each locus 
 void freq(int ntot,int nmiss[],const string &gi0,const string &gi1,const vector<short> &phe,
-    char &minor,char &major,char &rsk,double f1[2][2],int s){
+    char &minor,char &major,char &rsk,double f1[2][2],int s,int nchr,const vector<short> &sex){
 
   char code[4]={'T','C','G','A'};
   int count[2][4]={{0,}};   // nt counts for T, C, G, A in case-control
@@ -1032,6 +1036,7 @@ void freq(int ntot,int nmiss[],const string &gi0,const string &gi1,const vector<
 //int ntot=phe.size();
 //int ntot=gi0.size();
   int y=0;
+  int vcnt[2]={0,};  // number of chromosomes (==2*nmiss for autosomal snps)
   for(int n=0;n<ntot;n++){
     if(!q_qt) y=phe[n];
     int k;
@@ -1039,16 +1044,22 @@ void freq(int ntot,int nmiss[],const string &gi0,const string &gi1,const vector<
       if(code[k]==gi0.c_str()[n]) break;  // 1st allele
     if(k==4) continue;
     count[y][k]++;
+    vcnt[y]++;
     for(k=0;k<4;k++)
       if(code[k]==gi1.c_str()[n]) break;  // 2nd allele
-    if(k==4) continue;
+    if(k==4){
+      if(nchr==23 && sex[n]==0) nmiss[y]++;
+      continue;
+    }
     count[y][k]++;
+    vcnt[y]++;
     nmiss[y]++;
   }
 
   int ymax=(q_qt ? 1 : 2);
   for(int y=0;y<ymax;y++) for(int k=0;k<4;k++)
-    af[y][k]=count[y][k]/double(2*nmiss[y]);
+//  af[y][k]=count[y][k]/double(2*nmiss[y]);
+    af[y][k]=count[y][k]/double(vcnt[y]);
 
   int g0=-1;   // major allele
   int g1=-1;   // 2nd allele
@@ -1079,11 +1090,15 @@ void freq(int ntot,int nmiss[],const string &gi0,const string &gi1,const vector<
   for(int y=0;y<ymax;y++){
     f[y][0]=af[y][g0];
     f[y][1]=af[y][g1];
-    f0[0]+=f[y][0]*nmiss[y];
-    f0[1]+=f[y][1]*nmiss[y];
+//  f0[0]+=f[y][0]*nmiss[y];
+//  f0[1]+=f[y][1]*nmiss[y];
+    f0[0]+=f[y][0]*vcnt[y];
+    f0[1]+=f[y][1]*vcnt[y];
   }
-  f0[0]/=nmiss[0]+nmiss[1];         // combined g0 allele freq
-  f0[1]/=nmiss[0]+nmiss[1];         // combined g1 allele freq
+//f0[0]/=nmiss[0]+nmiss[1];         // combined g0 allele freq
+//f0[1]/=nmiss[0]+nmiss[1];         // combined g1 allele freq
+  f0[0]/=vcnt[0]+vcnt[1];         // combined g0 allele freq
+  f0[1]/=vcnt[0]+vcnt[1];         // combined g1 allele freq
 
   if(s==0){                         // first sample; determine major/minor
     if(q_minor_ctl){
@@ -1130,17 +1145,26 @@ void freq(int ntot,int nmiss[],const string &gi0,const string &gi1,const vector<
     int a0=k;                         // 1st allele
     for(k=0;k<4;k++)
       if(code[k]==gi1.at(n)) break;
-    if(k==4) continue;
+    if(k==4){
+      if(nchr!=23 || sex[n]==1)       // not male-X: missing data
+        continue;
+    }
     int a1=k;                         // 2nd allele
 
-    if((code[a0]==minor && code[a1]==major) || 
-       (code[a0]==major && code[a1]==minor))
-      f1[y][0]++;                        // ai=1  (aA)
-    else if(code[a0]==minor && code[a1]==minor)
-      f1[y][1]++;                        // ai=2  (AA)
+    if(nchr==23 && sex[n]==0){        // male-X
+      if(code[a0]==minor) f1[y][0]++;
+    }
+    else{
+      if((code[a0]==minor && code[a1]==major) || 
+         (code[a0]==major && code[a1]==minor))
+        f1[y][0]++;                        // ai=1  (aA)
+      else if(code[a0]==minor && code[a1]==minor)
+        f1[y][1]++;                        // ai=2  (AA)
+    }
   }
   for(int y=0;y<ymax;y++) for(int a=0;a<2;a++)
-    f1[y][a]/=nmiss[y];
+//  f1[y][a]/=nmiss[y];
+    f1[y][a]/=vcnt[y];
 
 }
 
@@ -1502,7 +1526,7 @@ void pr_tped(string &tped,string &tfam,string &meta_file,string &par_file,string
          end();
        }
        int nmiss[2]={0,};
-       freq(nsize,nmiss,gi0,gi1,phe[s],minor,major,rsk,f1,s);
+       freq(nsize,nmiss,gi0,gi1,phe[s],minor,major,rsk,f1,s,nchr,sex[s]);
        int nc[2]={0,};
        for(int n=0;n<int(nsize);n++){
          int y=phe[s][n];
@@ -1810,7 +1834,7 @@ void il_bpr(string &meta_file,string &out_file,string &par_file,bool q_lr){
       }
       int nmiss[2]={0,};
       double fr1[2][2]={{0,}};
-      freq(nsize,nmiss,gi0,gi1,phe[s],minor,major,rsk,fr1,s);
+      freq(nsize,nmiss,gi0,gi1,phe[s],minor,major,rsk,fr1,s,nchr[i],sex[s]);
       int nc[2]={0,};
       int y=0;
       for(int n=0;n<int(gi0.size());n++){
