@@ -77,14 +77,12 @@ If the number of individuals _n_ in case/control groups is not a multiple of _k_
 
 	--cv 5
 
-for which the default is 5. An error is issued if _k_ is too large (subset size less than 2 individuals). The output is a combined list of predicted risk and phenotypes of _k_ test sets (nearly) equal in size to the original data set. Each cross-validation run consists of IL/CL inference on the training set and prediction on the test set. After _k_ runs, GeDI will calculate the area under the curve (AUC) of the receiver operating characteristics (ROC) and print it to standard output along with 95% confidence intervals. Each run will in general have different numbers of SNPs selected under the specified --pcut, because only the test set is used for SNP selection. The standard output will also print the mean number of SNPs selected. In CL, the (geometric) mean of overall asymptotic p-values is also printed. The output file (default "gedi.out") will contain the risk probabilities of the combined test sets. Multiple parameters can be specified for batch runs:
+for which the default is 5. An error is issued if _k_ is too large (subset size less than 2 individuals). The output is a combined list of predicted risk and phenotypes of _k_ test sets (nearly) equal in size to the original data set. Each cross-validation run consists of IL/CL inference on the training set and prediction on the test set. After _k_ runs, GeDI will calculate the area under the curve (AUC) of the receiver operating characteristics (ROC) and print it to standard output along with 95% confidence intervals. Each run will in general have different numbers of SNPs selected under the specified --pcut, because only the test set is used for SNP selection. The standard output will also print the mean number of SNPs selected. The output file (default "gedi.out") will contain the risk probabilities of the combined test sets. Multiple parameters can be specified for batch runs:
 
         --ld 0.1 0.2 1
 	--eps 1e-3 1e-2 0.1
 
 and cross-validation runs will be repeated. By default, AUC values are output seperately into a file "gedi.auc".
-
-One possibility for the input data is to concatenate tped files from all chromosomes into a single file. Better yet, use a binary ".bed" file. 
 
 ***
 [Up](README.md)
