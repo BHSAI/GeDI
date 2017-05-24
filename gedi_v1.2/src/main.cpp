@@ -44,7 +44,8 @@ bool q_pr=false;           // flag for prediction
 bool q_lr=false;           // flag for logistic/linear regression
 bool q_Lh=false;           // flag for Lh=LJ
 string excl_file="";       // snp exclusion list file 
-double pcut=-1;            // p-value cutoff for cross-validation
+//double pcut=-1;          // p-value cutoff for cross-validation
+double pcut=1;             // p-value cutoff for cross-validation
 double tol=1.0e-5;         // iteration tolerance
 double corr0=0;            // correlation under covariates-only
 vector<double> lambda;     // penalizer

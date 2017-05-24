@@ -1579,8 +1579,8 @@ void pr_tped(string &tped,string &tfam,string &meta_file,string &par_file,string
    vector<double> beta1;
    vector<double> beta2;
    vector<double> pv;                 // p-values
-   if(pcut<0)                         // p-value cutoff not specified
-     pcut=0.05/nsnp;                  // Bonferroni
+// if(pcut<0)                         // p-value cutoff not specified
+//   pcut=0.05/nsnp;                  // Bonferroni
    cout << "p-value cutoff: " << pcut << endl << endl;
 
    vector<vector<double> > risk;      // (risk,y)
@@ -1877,8 +1877,8 @@ void il_bpr(string &meta_file,string &out_file,string &par_file,bool q_lr){
   vector<double> beta1;
   vector<double> beta2;
   vector<double> pv;                 // p-values
-  if(pcut<0)                         // p-value cutoff not specified
-    pcut=0.05/nsnp;                  // Bonferroni
+//if(pcut<0)                         // p-value cutoff not specified
+//  pcut=0.05/nsnp;                  // Bonferroni
   cout << "p-value cutoff: " << pcut << endl << endl;
 
   vector<vector<double> > risk;      // (risk,y)

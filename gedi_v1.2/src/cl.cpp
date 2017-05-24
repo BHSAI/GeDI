@@ -1262,9 +1262,9 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
     string &par,bool q_lr,bool q_pr,bool q_qi,int nsample,const vector<string> &rs,
     const vector<vector<vector<double> > > &covar,const vector<vector<vector<int> > > &cov_ds){
 
-  int nsnp=int(ai[0][0].size())/2;
-  if(pcut<0)
-    pcut=0.05/nsnp;
+//int nsnp=int(ai[0][0].size())/2;
+//if(pcut<0)
+//  pcut=0.05/nsnp;
 
   ofstream of,ocv;
   if(master) of.open(out_file.c_str(),ios::out);
@@ -1596,7 +1596,8 @@ void roc(ofstream &ocv,vector<vector<double> > &risk,int ncovar){
         cout << "R = " << r << endl;
         cout << "R2 = " << r*r << endl;
       }
-      if(!q_covar && ntot>2){
+//    if(!q_covar && ntot>2){
+      if(!q_covar && ntot>2 && corr0==0){
         double t=r*sqrt((ntot-2)/(1-r*r));
         double p=gsl_cdf_tdist_Q(t,double(ntot-2));
         if(master){
@@ -1604,7 +1605,8 @@ void roc(ofstream &ocv,vector<vector<double> > &risk,int ncovar){
           if(ocv.is_open()) ocv << r << " " << p << endl;
         }
       }
-      else if(q_covar && ntot>3){
+//    else if(q_covar && ntot>3){
+      else if(ntot>3){
         double f=0.5*log((1+r)/(1-r));  // Fisher transformation
         double f0=0.5*log((1+corr0)/(1-corr0)); 
         double z=sqrt(ntot-3.0)*(f-f0);
