@@ -1395,7 +1395,7 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
             if(!q_qtil)
               cout << "lambda = (" << Lh << ", " << para[k] << ")\n";
             else
-              cout << "lambda = " << para[k] << endl;
+              cout << "lambda = " << Lh << endl;
             ocv << Lh << " " << para[k] << " ";
           }
           else{
