@@ -65,6 +65,7 @@ extern long Start;       // starting position (1-based)
 extern long End;         // end position (1-based)
 extern bool q_boot;      // flag for phenotype permutation
 extern bool q_gnul;      // true if shuffling genotype label
+extern bool q_mnul;      // true if shuffling snp label
 extern bool q_strict;    // flag for strict run
 extern bool q_qt;        // true if quantitative trait
 extern bool q_qtil;      // true if quantitative trait IL
@@ -585,7 +586,7 @@ void cl_main(string &tped,string &tfam,string &meta,string &par,string &out_file
   vector<vector<vector<double> > > covar;
   vector<vector<vector<int> > > cov_ds;
 
-  if(q_boot || q_gnul){
+  if(q_boot || q_gnul || q_mnul){
     gsl_rng_env_setup();
     T=gsl_rng_default;
     r=gsl_rng_alloc(T);
@@ -618,7 +619,7 @@ void cl_main(string &tped,string &tfam,string &meta,string &par,string &out_file
 
   cl_inf(ai,nptr,yk,out_file,par,q_lr,q_pr,q_qi,nsample,rs,covar,cov_ds);     // CL inference
 
-  if(q_boot || q_gnul)
+  if(q_boot || q_gnul || q_mnul)
     gsl_rng_free(r);
 }
 
@@ -926,7 +927,7 @@ void bin_read(string &meta,int &nsample,vector<vector<int> > &nptr,
       }
       vector<int> index(nsize);
       for(int n=0;n<int(nsize);n++) index[n]=n;
-      if(q_gnul)                // shuffle genotype label
+      if(q_gnul || q_mnul)                 // shuffle genotype label
         ishuffle(index);
       int nc[2]={0,};
       for(int n=0;n<int(nsize);n++){
@@ -937,6 +938,23 @@ void bin_read(string &meta,int &nsample,vector<vector<int> > &nptr,
         nc[y]++;
       }
     }
+  }
+
+  if(q_mnul){   // snp label permutation
+    vector<vector<vector<bool> > > ai2=ai;
+    int nmax=ai[0].size();
+    vector<int> index(nsnp);
+    for(int i=0;i<nsnp;i++) index[i]=i;
+    int ymax=2;
+    if(q_qt) ymax=1;
+    for(int y=0;y<ymax;y++) for(int n=0;n<nmax;n++){
+      ishuffle(index);
+      for(int i=0;i<nsnp;i++){
+        ai[y][n][2*index[i]]=ai2[y][n][2*i];
+        ai[y][n][2*index[i]+1]=ai2[y][n][2*i+1];
+      }
+    }
+    if(master) cout << "SNP labels permuted\n\n";
   }
 
   if(master){

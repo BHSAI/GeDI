@@ -68,6 +68,7 @@ long Start=-1;             // starting position (1-based)
 long End=-1;               // end position (1-based)
 bool q_boot=false;         // flag for phenotype permutation
 bool q_gnul=false;         // flag for genotyppe permutation
+bool q_mnul=false;         // flag for snp label permutation
 bool q_strict=false;       // flag for being strict
 int Seed=1;                // random no. seed
 float Max_mem=3.0e9;       // maximum memory
@@ -231,7 +232,11 @@ int main(int argc,char* argv[]){
        }
        else if(flag=="null"){
          q_gnul=true;
-         if(master) cout << "Genotype permutation\n";
+         if(master) cout << "Phenotype permutation\n";
+       }
+       else if(flag=="mull"){
+         q_mnul=true;
+         if(master) cout <<"Phenotype/SNP label permutation\n";
        }
        else{
          if(master){ cerr << "Unknown option: " << flag << endl;
