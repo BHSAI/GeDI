@@ -32,7 +32,8 @@ extern unsigned int Imax;; // maximum no. of iterations
 extern double tol;       // iteration tolerance
 extern vector<double> lambda;
 extern vector<double> eps;
-extern double Lh;        // penalizer for h
+double Lh;        // penalizer for h
+extern vector<double> lambdh;
 extern int Npr;
 const int Npr2=10;
 extern float Max_mem;    // maximum memory allowed
@@ -1321,13 +1322,16 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
       roc(ocv,risk,ncovar);
     }
     else{
-      for(unsigned int k=0;k<para.size();k++){
+      unsigned int um=1;
+      if(q_Lh) um=lambdh.size();
+      for(unsigned int u=0;u<um;u++) for(unsigned int k=0;k<para.size();k++){
         bool q_crash=false;
         risk.resize(0);
         double s=0;
         double lnp=0;
         if(q_qt && q_lr) Lh=para[k];
         if(q_qt && !q_Lh) Lh=para[k];
+        if(q_Lh) Lh=lambdh[u];
         for(int nv=0;nv<ncv;nv++){
           if(master){
             if(q_mf)
@@ -1446,10 +1450,13 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
   }
   double dev=0;
   ofstream dummy;
-  for(unsigned int k=0;k<para.size();k++){
+  unsigned int um=1;
+  if(q_Lh) um=lambdh.size();
+  for(unsigned int u=0;u<um;u++) for(unsigned int k=0;k<para.size();k++){
     risk.resize(0);
     if(q_qt && q_lr) Lh=para[k];
     if(q_qt && !q_Lh) Lh=para[k];
+    if(q_Lh) Lh=lambdh[u];
 //  if(q_ee || q_mf || q_pl)
     bool q_crash=false;
     if(!q_lr)

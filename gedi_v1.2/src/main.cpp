@@ -51,7 +51,8 @@ double corr0=0;            // correlation under covariates-only
 vector<double> lambda;     // penalizer
 vector<double> eps;        // MFA regularizer
 double Prev=-1;            // disease prevalence
-double Lh=0;               // penalizer for h
+//double Lh=0;               // penalizer for h
+vector<double> lambdh;     // Lh
 unsigned int Imax=1000;    // maximum no. of iteration
 string qc_outf="qc.tped";  // quality control mode output genotype file
 string bfile="";           // binary data file prefix
@@ -67,7 +68,7 @@ int Chr=0;                 // chromosome no. (1-based)
 long Start=-1;             // starting position (1-based)
 long End=-1;               // end position (1-based)
 bool q_boot=false;         // flag for phenotype permutation
-bool q_gnul=false;         // flag for genotyppe permutation
+bool q_gnul=false;         // flag for phenotype permutation2
 bool q_mnul=false;         // flag for snp label permutation
 bool q_strict=false;       // flag for being strict
 int Seed=1;                // random no. seed
@@ -275,7 +276,6 @@ int main(int argc,char* argv[]){
        else if(flag=="seed")
          Seed=atoi(argv[i++]);
        else if(flag=="ld" || flag=="lhj"){
-//       q_ld=true;
          string nu;
          lambda.resize(0);
          while(1){
@@ -315,7 +315,17 @@ int main(int argc,char* argv[]){
          cvrout=argv[i++];
        }
        else if(flag=="lh"){
-         Lh=atof(argv[i++]);
+         string nu;
+         lambdh.resize(0);
+         while(1){
+           nu=argv[i++];
+           if(nu.substr(0,1)=="-"){
+             i--;
+             break;
+           }
+           lambdh.push_back(atof(nu.c_str()));
+           if(i==argc) break;
+         }
          q_Lh=true;
        }
        else if(flag=="meta"){
