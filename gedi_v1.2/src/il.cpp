@@ -122,8 +122,9 @@ void read_bfm(vector<string> &mbfile,const string& meta,int nind[2],vector<vecto
           end();
         }
       }
+      double morgan;
       int ipos;
-      iss >> ipos; iss >> ipos;
+      iss >> morgan; iss >> ipos;
       if(s==0) pos.push_back(ipos);
       else{
         if(ipos!=pos[nsnp2]){
@@ -266,7 +267,7 @@ void il_bed(string &meta,string &out_file,bool q_lr){
     }
   }
  
-  double qsum=0;
+//double qsum=0;
   for(int i=0;i<nsnp;i++){  // loop over snps
     double alpha=0;
     double beta[2]={0,};
@@ -327,8 +328,7 @@ void il_bed(string &meta,string &out_file,bool q_lr){
       int nmiss[2]={0,};
       double fr1[2][2]={{0,}};
       double fry[2]={0,};    // y-weighted freq. for qt
-      freq(nsize,nmiss,gi0,gi1,phe[s],minor,major,rsk,fr1,s,nchr[i],sex[s]);  // if s==0, minor/major are set; otherwise 
-                                                         // they are used and not changed
+      freq(nsize,nmiss,gi0,gi1,phe[s],minor,major,rsk,fr1,s,nchr[i],sex[s]);  // if s==0, minor/major are set; otherwise they are used and not changed
       vector<short> ak;
       if(q_qt){
         ak.resize(nsize);
@@ -346,6 +346,10 @@ void il_bed(string &meta,string &out_file,bool q_lr){
       double bet[2]={0,};
       double q=0;
       bool nna=true;
+      if(fr1[0][0]==0 && fr1[0][1]==00){ 
+        nna=false; 
+        continue;
+      }
       vector<double> h(2*L);
       vector<double> bcov;   // covariate coefficients
       double r2=0;
@@ -423,12 +427,12 @@ void il_bed(string &meta,string &out_file,bool q_lr){
       }
     }
     if(master) il_stat(of,nchr[i],rs[i],pos[i],minor,nmist,nnat,qtot,nscount,ncovar,alpha,beta,hs,r2s);
-    qsum+=qtot;
+//  qsum+=qtot;
   }  // end of snp loop
 
   if(master){
     cout << nsnp << " snps analyzed\n\n";
-    cout << "Likelihood ratio statistic: " << qsum << endl << endl;
+//  cout << "Likelihood ratio statistic: " << qsum << endl << endl;
     of.close();
   }
   for(int s=0;s<nsample;s++) f0[s].close();
@@ -571,7 +575,7 @@ void il_tped(string &tped,string &tfam,string &meta_file,string &out_file,bool q
      }
    }
 
-   double qsum=0;
+// double qsum=0;
    string line;
    while(getline(f0[0],line)){  // loop over snps (rows)
      double r2s=0;
@@ -725,11 +729,11 @@ void il_tped(string &tped,string &tfam,string &meta_file,string &out_file,bool q
      }
      nsnp++;
      if(master) il_stat(of,nchr,rsn[0],pos,minor,nmist,nnat,qtot,nscount,ncovar,alpha,beta,hs,r2s);
-     qsum+=qtot;
+//   qsum+=qtot;
    }
    if(master){
      cout << nsnp << " snps analyzed\n\n";
-     cout << "Likelihood ratio statistic: " << qsum << endl << endl;
+//   cout << "Likelihood ratio statistic: " << qsum << endl << endl;
    }
 
    for(int s=0;s<nsample;s++) f0[s].close();
@@ -908,8 +912,10 @@ void il_stat(ofstream& of,int nchr,string &rsn,int pos,char minor,int nmiss[],bo
        if(model==GEN) of << setw(11) << left << "NA" << " ";
        of << setw(11) << left << "NA" << " ";
        of << setw(11) << left << "NA" << " ";
-       of << setw(4) << left << "NA" << " ";
-       of << setw(11) << left << "NA" << endl;
+       if(!q_qt){
+         of << setw(4) << left << "NA" << " ";
+         of << setw(11) << left << "NA" << endl;
+       }
      }
 }
 

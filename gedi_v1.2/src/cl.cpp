@@ -783,7 +783,8 @@ void bin_read(string &meta,int &nsample,vector<vector<int> > &nptr,
         }
       }
       long ipos;
-      iss >> ipos; iss >> ipos;
+      double morgan;
+      iss >> morgan; iss >> ipos;
       if(Start>0 && ipos<Start) continue;  // skip regions outside requested domain
       if(End>0 && End<ipos) continue; 
       if(s==0) pos.push_back(ipos);
