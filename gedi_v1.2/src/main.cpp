@@ -494,7 +494,7 @@ int main(int argc,char* argv[]){
        if(master) cerr << "Please specify only one among -pseudo, -ee, -mf, -lr. Bye!\n";
        end();
      }
-     if(q_lr & (q_meta || q_metab)){
+     if(q_lr && (q_meta || q_metab) && !q_qt){
        if(master) cerr << "CL meta analysis with logistic regresion not implemented. Bye!\n";
        end();
      }

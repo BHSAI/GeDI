@@ -349,6 +349,7 @@ bool qtlr_assoc(const vector<short> &ak,const vector<double> &yk,int &nind,doubl
       s1+=(a-xave)*(a-xave);
       y2+=y*y;
     }
+    if(s1==0) return false;
     beta1=s0/s1;                
     beta0=yave-beta1*xave;        
     double s2=0;
