@@ -73,6 +73,7 @@ bool q_mnul=false;         // flag for snp label permutation
 bool q_strict=false;       // flag for being strict
 int Seed=1;                // random no. seed
 float Max_mem=3.0e9;       // maximum memory
+string auc_test="hanley";  // AUC test (Hanley or DeLong)
 
 void estop(int ecode){
    
@@ -238,6 +239,9 @@ int main(int argc,char* argv[]){
        else if(flag=="mull"){
          q_mnul=true;
          if(master) cout <<"Phenotype/SNP label permutation\n";
+       }
+       else if(flag=="delong"){
+         auc_test="delong";
        }
        else{
          if(master){ cerr << "Unknown option: " << flag << endl;

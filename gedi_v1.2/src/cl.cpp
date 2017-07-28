@@ -77,6 +77,7 @@ extern bool q_dump;      // true if dumping snp lists in CV
 extern int Seed;         // random no. seed
 extern string cvar_file; // covariate file
 extern string cvrout;    // covariate parameter output
+extern string auc_test;  // AUC test
 #ifdef MPIP
 extern bool q_mfp;       // flag for parallel MF
 const int Nb=32;         // block size for parallel MF (ScaLAPACK)
@@ -1622,7 +1623,6 @@ void roc(ofstream &ocv,vector<vector<double> > &risk,int ncovar){
         cout << "R = " << r << endl;
         cout << "R2 = " << r*r << endl;
       }
-//    if(!q_covar && ntot>2){
       if(!q_covar && ntot>2 && corr0==0){
         double t=r*sqrt((ntot-2)/(1-r*r));
         double p=gsl_cdf_tdist_Q(t,double(ntot-2));
@@ -1631,12 +1631,10 @@ void roc(ofstream &ocv,vector<vector<double> > &risk,int ncovar){
           if(ocv.is_open()) ocv << r << " " << p << endl;
         }
       }
-//    else if(q_covar && ntot>3){
       else if(ntot>3){
         double f=0.5*log((1+r)/(1-r));  // Fisher transformation
         double f0=0.5*log((1+corr0)/(1-corr0)); 
         double z=sqrt(ntot-3.0)*(f-f0);
-//      double z=sqrt(ntot-ncovar-3.0)*(f-f0);
         double p=gsl_cdf_ugaussian_Q(z);
         if(master){
          cout << "P(R0 = " << corr0 << ") = " << p << endl;
@@ -1666,20 +1664,62 @@ void roc(ofstream &ocv,vector<vector<double> > &risk,int ncovar){
     of.close();
 
     double auc=0;
+    double se=0;
     for(unsigned int k=1;k<roc.size();k++){
       double dx=roc[k][0]-roc[k-1][0];
       double dy=roc[k][1]+roc[k-1][1];
       auc+=dx*dy/2.0;
     }
-    double q1=auc/(2-auc);
-    double q2=2*auc*auc/(1+auc);
-    double se=auc*(1-auc)+(n1-1)*(q1-auc*auc)+(n0-1)*(q2-auc*auc);
-    se/=n0*n1;                        // Hanley & McNeil
+    if(auc_test=="hanley"){           // Hanley & McNeil
+      double q1=auc/(2-auc);
+      double q2=2*auc*auc/(1+auc);
+      se=auc*(1-auc)+(n1-1)*(q1-auc*auc)+(n0-1)*(q2-auc*auc);
+      se/=n0*n1;   
+    }
+    else{                             // DeLong
+      vector<double> v10(n1);
+      vector<double> v01(n0);
+      vector<double> x;
+      vector<double> y;
+      for(int k=0;k<ntot;k++){
+        if(risk[k][1]==1) x.push_back(risk[k][0]);
+        else y.push_back(risk[k][0]);
+      }
+      for(int i=0;i<n1;i++){
+        for(int j=0;j<n0;j++){
+          if(x[i]>y[j]) v10[i]++;
+          else if(x[i]==y[j]) v10[i]+=0.5;
+        }
+        v10[i]/=n0;
+      }
+      for(int j=0;j<n0;j++){
+        for(int i=0;i<n1;i++){
+          if(x[i]>y[j]) v01[j]++;
+          else if(x[i]==y[j]) v01[j]+=0.5;
+        }
+        v01[j]/=n1;
+      }
+      double s10=0;
+      for(int i=0;i<n1;i++)
+        s10+=(v10[i]-auc)*(v10[i]-auc);
+      s10/=n1-1;
+      double s01=0;
+      for(int j=0;j<n0;j++)
+        s01+=(v01[j]-auc)*(v01[j]-auc);
+      s01/=n0-1;
+      se=s10/n1+s01/n0;
+    }
     se=sqrt(se);
     double za=1.959964;               // Phi^{-1}(1-0.05/2)
+    double z=(auc-0.5)/se;
+    double p=gsl_cdf_ugaussian_Q(z);
 
-    cout << "AUC: " << auc << " +- " << za*se << " (95% CI)\n\n";;
-    ocv << auc << " " << za*se << endl;
+    cout << "AUC: " << auc << " +- " << za*se << " (95% CI)\n";;
+    if(auc_test=="hanley")
+      cout << "P (Hanley) = " << p << endl << endl;
+    else
+      cout << "P (DeLong) = " << p << endl << endl;
+    ocv << auc << " " << za*se << " " << p << endl;
 }
 
 void snp_select(const vector<vector<vector<bool> > > &ai,int nv,
