@@ -1174,7 +1174,7 @@ void freq(int ntot,int nmiss[],const string &gi0,const string &gi1,const vector<
   }
   for(int y=0;y<ymax;y++) for(int a=0;a<2;a++)
 //  f1[y][a]/=nmiss[y];
-    f1[y][a]/=vcnt[y];
+    f1[y][a]/=vcnt[y]/2;
 
 }
 
