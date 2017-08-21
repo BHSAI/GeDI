@@ -38,7 +38,6 @@ bool q_lrp=false;          // flag for parallel ridge regression
 bool q_qtpl=false;         // flag for maximum likelihood IL
 bool q_qtil=false;         // flag for qt-IL
 bool q_covar=false;        // flag for covariates
-bool q_covar0=false;       // flag for covariate-only
 bool q_nsvd=false;
 bool q_pr=false;           // flag for prediction
 bool q_lr=false;           // flag for logistic/linear regression
@@ -210,10 +209,6 @@ int main(int argc,char* argv[]){
        }
        else if(flag=="covar")
          q_covar=true;
-       else if(flag=="covar_only"){
-         q_covar0=true;
-         q_covar=true;
-       }
        else if(flag=="qtpl"){
          q_qt=true;
          q_qtpl=true;
@@ -309,11 +304,6 @@ int main(int argc,char* argv[]){
        else if(flag=="covar"){ // covariate file
          cvar_file=argv[i++];
          q_covar=true;
-       }
-       else if(flag=="covar_only"){ // covariate file
-         cvar_file=argv[i++];
-         q_covar=true;
-         q_covar0=true;
        }
        else if(flag=="cvrout"){ // covar parameter output
          cvrout=argv[i++];
@@ -416,6 +406,14 @@ int main(int argc,char* argv[]){
      if(master) cout << "tfam file: " << tfam_file << endl << endl;
    }
 
+// refuse forbidden orders
+   if(q_qt && q_covar){  // qt under PL cannot use covariates (unless with -il)
+     if(q_cl || q_pr || !q_lr){
+       if(master) cerr  << "Covariates cannot be used with PL. Bye!\n";
+       end();
+     }
+   }
+
 // analysis section
 
    if(!q_cl && !q_il){
@@ -456,7 +454,8 @@ int main(int argc,char* argv[]){
      }
      if(q_meta || q_metab)
        if(master) cout << "Meta analysis with file lists from " << meta_file << endl << endl;
-     if(!(q_qt && q_pr)){        // QT prediction uses CL with J=0
+//   if(!(q_qt && q_pr)){        // QT prediction uses CL with J=0
+     if(!q_qt || q_lr){          // QT prediction uses CL with J=0
        if(q_tped || q_meta || q_metab || bfile!=""){
          if(!q_pr)
            if(bfile!="" || q_metab)
@@ -488,10 +487,8 @@ int main(int argc,char* argv[]){
    if(q_cl){
      if(master){
        cout << "Collective loci analysis\n\n";
-       if(q_qt){
+       if(q_qt)
          cout << "Quantitative trait\n\n";
-         if(q_covar0) cout << "Covariate-only analysis\n\n";
-       }
      }
      if(!q_ee && !q_mf && !q_lr) q_pl=true;   // default
      if(q_ee+q_mf+q_lr+q_pl!=1){

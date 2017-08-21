@@ -222,6 +222,7 @@ void il_bed(string &meta,string &out_file,bool q_lr){
       int ntot=nptr[s+1][0]-nptr[s][0];
       covar[s].resize(ntot);
       string file=mbfile[s]+".covar";
+      if(cvar_file!="") file=cvar_file;
       read_cov(file,fid[s],iid[s],covar[s],cov_ds[s]);
     }
     ncovar=covar[0][0].size();
@@ -1438,18 +1439,6 @@ void pr_tped(string &tped,string &tfam,string &meta_file,string &par_file,string
      }
    }
 
-/* vector<vector<vector<double> > > covar(nsample);
-   if(q_covar){                            // read covariates
-     for(int s=0;s<nsample;s++){
-       int ntot=nptr[s+1][0]-nptr[s][0];
-       if(!q_qt) ntot+=nptr[s+1][1]-nptr[s][0];
-       covar[s].resize(ntot);
-       string file=cvar_file[s]+".covar";
-       read_cov(file,fid[s],iid[s],covar[s]);
-     }
-   }
-*/
-
    string gi0,gi1;
    double f1[2][2]={{0,}};   // frequency f1[y=0,1][Aa,AA]
    char minor,major;         // minor and major alleles
@@ -1647,7 +1636,7 @@ void pr_tped(string &tped,string &tfam,string &meta_file,string &par_file,string
    bool comp(vector<double>a,vector<double> b);
    sort(risk.begin(),risk.end(),comp);
 // void roc(ofstream &ocv,vector<vector<double> > &risk);
-   roc(ocv,risk,0);
+   roc(ocv,risk);
    if(master) ocv.close();
 }
 
@@ -1747,20 +1736,6 @@ void il_bpr(string &meta_file,string &out_file,string &par_file,bool q_lr){
     }
   }
 
-/*   covariates are not used for now
-  vector<vector<vector<double> > > covar(nsample);
-  int ncovar=0;                         // read covariates
-  if(q_covar){
-    for(int s=0;s<nsample;s++){
-      int ntot=nptr[s+1][0]-nptr[s][0];
-      if(!q_qt) ntot+=nptr[s+1][1]-nptr[s][0];
-      covar[s].resize(ntot);
-      string file=mbfile[s]+".covar";
-      read_cov(file,fid[s],iid[s],covar[s]);
-    }
-    ncovar=covar[0][0].size();
-  }
-*/
   // read bed files
   ifstream *f0=new ifstream[nsample];
   for(int s=0;s<nsample;s++){
@@ -1939,8 +1914,7 @@ void il_bpr(string &meta_file,string &out_file,string &par_file,bool q_lr){
 
   bool comp(vector<double>a,vector<double> b);
   sort(risk.begin(),risk.end(),comp);
-//void roc(ofstream &ocv,vector<vector<double> > &risk);
-  roc(ocv,risk,0);
+  roc(ocv,risk);
   if(master) ocv.close();
 }
 

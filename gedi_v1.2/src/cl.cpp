@@ -40,7 +40,7 @@ extern float Max_mem;    // maximum memory allowed
 extern bool q_minor_ctl; // true if minor allele define wrt control only
 extern double Prev;      // disease prevalence
 extern double pcut;      // p-value cutoff
-extern double corr0;     // correlation under covariates-only
+extern double corr0;     // correlation under null
 extern bool q_ee;        // true if EE
 extern bool q_mf;        // true if MF
 extern bool q_cv;        // true if cross-validation
@@ -289,18 +289,12 @@ struct Pari{
   const vector<vector<double> > &h1;
   const vector<vector<vector<float> > > &J0;
   const vector<vector<vector<float> > > &J1;
-  const vector<double> &covar;
-  const vector<double> &bcov0;
-  const vector<double> &bcov1;
-  const vector<double> &cvar;
-  const vector<vector<int> > &cov_ds;
 };
 
 double prae(double y,void *params){   // returns the exponent of integrand
 
   Pari *par=(Pari *)params;
   int nsnp=(par->ai).size()/2;
-  if(q_covar0) nsnp=0;
 
   double e=0;
   for(int i=0;i<nsnp;i++){
@@ -329,26 +323,6 @@ double prae(double y,void *params){   // returns the exponent of integrand
     e+=x;
   }
   e-=y*y/2.0;
-  if(q_covar){
-    int ncovar=(par->covar).size();
-    double sum=0;
-    double pr=1.0;
-    for(int m=0;m<ncovar;m++){
-      if((par->cov_ds)[m].size()==2){             // discrete covariates for DDA
-        int cmin=(par->cov_ds)[m][0];
-        int cmax=(par->cov_ds)[m][1];
-        double ex=(par->bcov0)[m]+y*(par->bcov1)[m];
-        double z=0;
-        for(int cp=cmin;cp<=cmax;cp++) z+=exp(cp*ex);
-        pr*=exp((par->covar)[m]*ex)/z;
-      }
-      else{                    
-        double c=(par->covar)[m]-(par->bcov0)[m]-y*(par->bcov1)[m];
-        sum+=c*c/(par->cvar)[m];
-      }
-    }
-    e+=log(pr)-sum/2.0;
-  }
 
   return e;
 }
@@ -358,7 +332,6 @@ double pray(double y,void *params,double emax){
 
   Pari *par=(Pari *)params;
   int nsnp=(par->ai).size()/2;
-  if(q_covar0) nsnp=0;
 
   double f=1;
   double e=0;
@@ -388,26 +361,6 @@ double pray(double y,void *params,double emax){
     e+=x;
   }
   f=exp(e-y*y/2.0-emax);
-  if(q_covar){
-    int ncovar=(par->covar).size();
-    double sum=0;
-    double pr=1.0;
-    for(int m=0;m<ncovar;m++){
-      if((par->cov_ds)[m].size()==2){             // discrete covariates for DDA
-        int cmin=(par->cov_ds)[m][0];
-        int cmax=(par->cov_ds)[m][1];
-        double ex=(par->bcov0)[m]+y*(par->bcov1)[m];
-        double z=0;
-        for(int cp=cmin;cp<=cmax;cp++) z+=exp(cp*ex);
-        pr*=exp((par->covar)[m]*ex)/z;
-      }
-      else{                    
-        double c=(par->covar)[m]-(par->bcov0)[m]-y*(par->bcov1)[m];
-        sum+=c*c/(par->cvar)[m];
-      }
-    }
-    f*=pr*exp(-sum/2.0);
-  }
 
   if(par->expo==1)
     f*=y;
@@ -435,8 +388,7 @@ double pray(double y,void *params,double emax){
 */
 
 void pr_cl_qt(ofstream &of,const vector<vector<vector<vector<bool> > > > &ai,
-    const vector<vector<double> > &yk,Theta_qt &th_qt,vector<vector<double> > &risk,
-    const vector<vector<vector<double> > > &covar,const vector<vector<vector<int> > > &cov_ds){
+    const vector<vector<double> > &yk,Theta_qt &th_qt,vector<vector<double> > &risk){
 
   int nsample=ai.size();
   double pray(double y,void *param,double emax);
@@ -459,12 +411,7 @@ void pr_cl_qt(ofstream &of,const vector<vector<vector<vector<bool> > > > &ai,
     for(int n=nstart;n<nstop;n++){
       vector<double> tmp;
       vector<vector<int> > tmp2;
-      if(q_covar){
-        tmp=covar[s][n];
-        tmp2=cov_ds[s];
-      }
-      Pari par={0,ai[s][0][n],th_qt.h[0],th_qt.h[1],th_qt.J[0],th_qt.J[1],tmp,th_qt.bcov0,
-        th_qt.bcov1,th_qt.cvar,tmp2};
+      Pari par={0,ai[s][0][n],th_qt.h[0],th_qt.h[1],th_qt.J[0],th_qt.J[1]};
       void *param=(void *)&par;
       vector<double> expo;
       int nk=(2*Integ)/Dy;
@@ -534,16 +481,13 @@ void pr_cl_qt(ofstream &of,const vector<vector<vector<vector<bool> > > > &ai,
 }
 
 void pr_cl_qtlr(ofstream &of,const vector<vector<vector<vector<bool> > > > &ai,
-    const vector<vector<double> > &yk,Theta &th,vector<vector<double> > &risk,
-    const vector<vector<vector<double> > > &covar){
+    const vector<vector<double> > &yk,Theta &th,vector<vector<double> > &risk){
 
   int nsample=ai.size();
-  int ncovar=th.bcov.size();
 
   for(int s=0;s<nsample;s++){
     int nind=int(ai[s][0].size());
     int nsnp=int(ai[s][0][0].size()/2);
-    if(q_covar0) nsnp=0;
     for(int n=0;n<nind;n++){
       double yp=th.alpha;
       for(int i=0;i<nsnp;i++){
@@ -556,10 +500,6 @@ void pr_cl_qtlr(ofstream &of,const vector<vector<vector<vector<bool> > > > &ai,
           int jb=code(b,model);
           yp+=th.gamm[i][j][0]*ia*jb;
         }
-      }
-      if(q_covar){
-        for(int m=0;m<ncovar;m++)
-          yp+=th.bcov[m]*covar[s][n][m];
       }
       double y=yk[s][n]*qt_ysd[s]+qt_yav[s];
       if(of.is_open())
@@ -585,8 +525,6 @@ void cl_main(string &tped,string &tfam,string &meta,string &par,string &out_file
   vector<string> rs;           // rs#list
   vector<vector<string> > fid;
   vector<vector<string> > iid;
-  vector<vector<vector<double> > > covar;
-  vector<vector<vector<int> > > cov_ds;
 
   if(q_boot || q_gnul || q_mnul){
     gsl_rng_env_setup();
@@ -615,11 +553,11 @@ void cl_main(string &tped,string &tfam,string &meta,string &par,string &out_file
 
   vector<vector<double> > yk;
   if(bfile=="" && !q_metab)
-    tped_read(tped,tfam,meta,par,nsample,nptr,ai,rs,exc_list,yk,covar,cov_ds);   // read genotypes
+    tped_read(tped,tfam,meta,par,nsample,nptr,ai,rs,exc_list,yk);   // read genotypes
   else
-    bin_read(meta,nsample,nptr,ai,rs,exc_list,yk,q_lr,covar,cov_ds);
+    bin_read(meta,nsample,nptr,ai,rs,exc_list,yk,q_lr);
 
-  cl_inf(ai,nptr,yk,out_file,par,q_lr,q_pr,q_qi,nsample,rs,covar,cov_ds);     // CL inference
+  cl_inf(ai,nptr,yk,out_file,par,q_lr,q_pr,q_qi,nsample,rs);     // CL inference
 
   if(q_boot || q_gnul || q_mnul)
     gsl_rng_free(r);
@@ -642,8 +580,7 @@ int myrandom(int i){
 // reads data from binary files
 void bin_read(string &meta,int &nsample,vector<vector<int> > &nptr,
     vector<vector<vector<bool> > > &ai,vector<string> &rs,const vector<string> &exc_list,
-    vector<vector<double> > &yk,bool q_lr,
-    vector<vector<vector<double> > > &covar,vector<vector<vector<int> > > &cov_ds){
+    vector<vector<double> > &yk,bool q_lr){
 
   nsample=0;  // no. of samples
 
@@ -727,16 +664,6 @@ void bin_read(string &meta,int &nsample,vector<vector<int> > &nptr,
       }
       else      // quantitative trait (all shuffled)
         myshuffle(yk[s]);
-    }
-  }
-
-  if(q_covar){
-    covar.resize(nsample);
-    cov_ds.resize(nsample);
-    for(int s=0;s<nsample;s++){
-      covar[s].resize(yk[s].size());
-      string file=mbfile[s]+".covar";
-      read_cov(file,fid[s],iid[s],covar[s],cov_ds[s]);   // read covariates
     }
   }
 
@@ -838,7 +765,7 @@ void bin_read(string &meta,int &nsample,vector<vector<int> > &nptr,
     }
   }
   
-  if(master && !q_covar0){
+  if(master){
     cout << "Reading genotypes from ";
     for(int s=0;s<nsample;s++){
       cout << mbfile[s]+".bed";
@@ -861,7 +788,6 @@ void bin_read(string &meta,int &nsample,vector<vector<int> > &nptr,
     }
   }
 
-  if(q_covar0) nsnp=0;
   for(int i=0;i<nsnp;i++){
     if(master && i>=Npr && i%Npr==0) cout << "reading " << i << "'th SNP..." << endl;
 
@@ -987,8 +913,7 @@ void byte2bit(char dat,int bit[8]){
 
 void tped_read(string &tped,string &tfam,string &meta,string &par,int &nsample,
     vector<vector<int> > &nptr,vector<vector<vector<bool> > > &ai,vector<string> &rs,
-    const vector<string> &exc_list,vector<vector<double> > &yk,
-    vector<vector<vector<double> > > &covar,vector<vector<vector<int> > > &cov_ds){
+    const vector<string> &exc_list,vector<vector<double> > &yk){
 
   vector<string> mtped;
   vector<string> mtfam;
@@ -998,8 +923,6 @@ void tped_read(string &tped,string &tfam,string &meta,string &par,int &nsample,
   if(!q_meta){
     mtped.push_back(tped);
     mtfam.push_back(tfam);
-    if(q_covar)
-      mtcov.push_back(cvar_file);
     nsample=1;
   }
   else{
@@ -1020,11 +943,6 @@ void tped_read(string &tped,string &tfam,string &meta,string &par,int &nsample,
       iss >> name;
       if(master) cout << setw(15) << name << endl;
       mtfam.push_back(name);
-      if(q_covar){
-        iss >> name;
-        if(master) cout << setw(15) << name << endl;
-        mtcov.push_back(name);
-      }
       nsample++;
     }
     if(master) cout << endl;
@@ -1080,15 +998,6 @@ void tped_read(string &tped,string &tfam,string &meta,string &par,int &nsample,
       }
       else
         myshuffle(yk[s]);
-    }
-  }
-
-  if(q_covar){
-    covar.resize(nsample);
-    cov_ds.resize(nsample);
-    for(int s=0;s<nsample;s++){
-      covar[s].resize(yk[s].size());
-      read_cov(mtcov[s],fid[s],iid[s],covar[s],cov_ds[s]);
     }
   }
 
@@ -1280,8 +1189,7 @@ void sample(int N,int n,vector<int> &n1){
 
 void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
     const vector<vector<double> > &yk,string &out_file,
-    string &par,bool q_lr,bool q_pr,bool q_qi,int nsample,const vector<string> &rs,
-    const vector<vector<vector<double> > > &covar,const vector<vector<vector<int> > > &cov_ds){
+    string &par,bool q_lr,bool q_pr,bool q_qi,int nsample,const vector<string> &rs){
 
 //int nsnp=int(ai[0][0].size())/2;
 //if(pcut<0)
@@ -1300,13 +1208,7 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
   else
     para=lambda;
 
-  int ncovar=0;
-  if(q_covar) ncovar=covar[0][0].size();
-
   bool comp(vector<double> a,vector<double> b);
-//void roc(ofstream &ocv,vector<vector<double> > &risk);
-//vector<vector<vector<double> > >  covar2;
-//vector<vector<vector<int> > >  cov_ds2;
   if(q_pr){         // prediction mode
     if(master) ocv.open("gedi.auc",ios::out);
     if(!q_cv){
@@ -1314,14 +1216,14 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
       read_par_cl(ai,par,av[0],rs,th);     // read parameters
       if(q_qt){
         if(!q_lr)
-          pr_cl_qt(of,av,yk,th_qt,risk,covar,cov_ds);
+          pr_cl_qt(of,av,yk,th_qt,risk);
         else
-          pr_cl_qtlr(of,av,yk,th,risk,covar);   // ridge regression
+          pr_cl_qtlr(of,av,yk,th,risk);   // ridge regression
       }
       else
         pr_cl(of,av,th,risk);                // do prediction
       sort(risk.begin(),risk.end(),comp);
-      roc(ocv,risk,ncovar);
+      roc(ocv,risk);
     }
     else{
       unsigned int um=1;
@@ -1351,9 +1253,7 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
           vector<string> ra;                      // list of selected snp names
           vector<vector<double> > ykv(nsample);   // qt-phenotype for training set
           vector<vector<double> > ykw(nsample);   // qt-phenotype for test set
-          vector<vector<vector<double> > > covv(nsample); // covariates for trainig set
-          vector<vector<vector<double> > > covw(nsample); // covariates for test set
-          snp_select(ai,nv,av,aw,rs,ra,nptr,yk,ykv,ykw,covar,cov_ds,covv,covw);  
+          snp_select(ai,nv,av,aw,rs,ra,nptr,yk,ykv,ykw);
                                                   // select av based on training data
           int nsig=ra.size();                     // no. of selected snps
           s+=nsig;
@@ -1367,13 +1267,13 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
               file << ra[i] << endl;
             file.close();
           }
-          if(nsig==0 && !q_covar0){
+          if(nsig==0){
             cerr << " Try increasing pcut \n";
             end();
           }
           double dev=0;
           if(!q_lr){
-            dev=cl_gdi(av,ykv,q_qi,ra,para[k],nptr,th,th_qt,covv,cov_ds,q_crash);
+            dev=cl_gdi(av,ykv,q_qi,ra,para[k],nptr,th,th_qt,q_crash);
             if(q_crash){
               if(master) cerr << "GSL convergence failure \n";
               break;
@@ -1385,7 +1285,7 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
               if(!q_qt)
                 dev+=cl_dlr(ra,av[s],para[k],th,q_qi);
               else
-                dev+=cl_qtlr(ra,av[s],ykv[s],para[k],th,q_qi,covv[s]);
+                dev+=cl_qtlr(ra,av[s],ykv[s],para[k],th,q_qi);
             }
           if(master){
 //          if(!(q_qt && q_lr))
@@ -1402,9 +1302,9 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
           }
           if(q_qt){
             if(!q_lr)
-              pr_cl_qt(of,aw,ykw,th_qt,risk,covw,cov_ds);
+              pr_cl_qt(of,aw,ykw,th_qt,risk);
             else
-              pr_cl_qtlr(of,aw,ykw,th,risk,covw);
+              pr_cl_qtlr(of,aw,ykw,th,risk);
           }
           else
             pr_cl(of,aw,th,risk);
@@ -1428,7 +1328,7 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
           }
         }
         sort(risk.begin(),risk.end(),comp);
-        roc(ocv,risk,ncovar);
+        roc(ocv,risk);
       }
     }
     ocv.close();
@@ -1441,9 +1341,7 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
   vector<string> ra;                      // list of selected snp names
   vector<vector<double> > ykv(nsample);   // not used
   vector<vector<double> > ykw(nsample);   // not used
-  vector<vector<vector<double> > > covv(nsample);
-  vector<vector<vector<double> > > covw(nsample);
-  snp_select(ai,-1,av,aw,rs,ra,nptr,yk,ykv,ykw,covar,cov_ds,covv,covw);
+  snp_select(ai,-1,av,aw,rs,ra,nptr,yk,ykv,ykw);
   int nsig=ra.size();                     // no. of selected snps
   if(master) cout << nsig << " SNPs selected with p < " << pcut << endl << endl;
   if(nsig==0){
@@ -1455,45 +1353,42 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
   unsigned int um=1;
   if(q_Lh) um=lambdh.size();
   for(unsigned int u=0;u<um;u++) for(unsigned int k=0;k<para.size();k++){
+    bool q_crash=false;
     risk.resize(0);
     if(q_qt && q_lr) Lh=para[k];
     if(q_qt && !q_Lh) Lh=para[k];
     if(q_Lh) Lh=lambdh[u];
 //  if(q_ee || q_mf || q_pl)
-    bool q_crash=false;
     if(!q_lr)
-      dev=cl_gdi(aw,yk,q_qi,ra,para[k],nptr,th,th_qt,covar,cov_ds,q_crash);  // GDI
+      dev=cl_gdi(aw,yk,q_qi,ra,para[k],nptr,th,th_qt,q_crash);  // GDI
     else
       for(int s=0;s<nsample;s++){
         if(!q_qt)
           dev+=cl_dlr(ra,aw[s],para[k],th,q_qi); // LR
         else
-          dev+=cl_qtlr(ra,aw[s],ykw[s],para[k],th,q_qi,covw[s]);
+          dev+=cl_qtlr(ra,aw[s],ykw[s],para[k],th,q_qi);
       }
-    if(master) par_out(of,ra,dev,nsig,aw,th,th_qt,q_lr,cov_ds[0]);
+    if(master) par_out(of,ra,dev,nsig,aw,th,th_qt,q_lr);
     if(q_qt){
       if(!q_lr)
-        pr_cl_qt(dummy,aw,ykw,th_qt,risk,covar,cov_ds);
+        pr_cl_qt(dummy,aw,ykw,th_qt,risk);
       else
-        pr_cl_qtlr(dummy,aw,ykw,th,risk,covar);
+        pr_cl_qtlr(dummy,aw,ykw,th,risk);
     }
-    if(q_qt) roc(ocv,risk,ncovar);
+    if(q_qt) roc(ocv,risk);
   }
   if(master) of.close();
 }
 
 void par_out(ofstream &of,const vector<string> &rs,double dev,int nsig,
-    const vector<vector<vector<vector<bool> > > > &aw,Theta &th,Theta_qt &th_qt,bool q_lr,
-    const vector<vector<int> > &cov_ds){
+    const vector<vector<vector<vector<bool> > > > &aw,Theta &th,Theta_qt &th_qt,bool q_lr){
 
   int nsample=aw.size();
-  int ncovar=0;
-  if(q_covar) ncovar=cov_ds.size();
   if(master){
     cout << "Collective likelihood ratio statistic: " << dev << endl;
     if(!(q_qt && q_lr)){
       int nsample=aw.size();
-      double df=nsample*(L*nsig+L*L*nsig*(nsig-1)/2+ncovar);
+      double df=nsample*(L*nsig+L*L*nsig*(nsig-1)/2);
       cout << "Degrees of freedom: " << df << endl;
       if(q_pout){
         double lnp= (dev>=0 ? gsl_sf_gamma_inc_Q(0.5*df,dev/2) : 1 );
@@ -1567,13 +1462,6 @@ void par_out(ofstream &of,const vector<string> &rs,double dev,int nsig,
   fl.open(cvrout.c_str(),ios::out);
   fl << right << setw(7) << "Index" <<  setw(12) << " Coeff0" << setw(12) 
      << " Coeff1" << setw(12) << " Var\n";
-  for(int m=0;m<ncovar;m++){
-    fl << setw(7) << m+1 << " " << setw(11) << th_qt.bcov0[m] << " " << setw(11) << th_qt.bcov1[m];
-    if(cov_ds[m].size()==0)             // continuous covariate
-      fl << " " << setw(11) << th_qt.cvar[m] << endl;
-    else
-      fl << " " << setw(11) << "NA" << endl;         // discrete covariate
-  }
   fl.close();
 }
 
@@ -1581,7 +1469,7 @@ bool comp(vector<double> a,vector<double> b){ return a[0]>b[0]; }
 // select significant snps based on training set
 
 // calculats receiver operating characterisic and its area under curve (or correlation for qt)
-void roc(ofstream &ocv,vector<vector<double> > &risk,int ncovar){
+void roc(ofstream &ocv,vector<vector<double> > &risk){
 
     double n0=0;
     double n1=0;
@@ -1623,22 +1511,19 @@ void roc(ofstream &ocv,vector<vector<double> > &risk,int ncovar){
         cout << "R = " << r << endl;
         cout << "R2 = " << r*r << endl;
       }
-      if(!q_covar && ntot>2 && corr0==0){
-        double t=r*sqrt((ntot-2)/(1-r*r));
-        double p=gsl_cdf_tdist_Q(t,double(ntot-2));
-        if(master){
-         cout << "P = " << p << endl;
-          if(ocv.is_open()) ocv << r << " " << p << endl;
-        }
-      }
-      else if(ntot>3){
-        double f=0.5*log((1+r)/(1-r));  // Fisher transformation
-        double f0=0.5*log((1+corr0)/(1-corr0)); 
-        double z=sqrt(ntot-3.0)*(f-f0);
+      if(ntot>3){
+        double f=gsl_atanh(r);
+        double f0=gsl_atanh(r0);
+        double se=1.0/sqrt(ntot-3.0);
+        double z=(f-f0)/se;
+        double z95=1.959964;
         double p=gsl_cdf_ugaussian_Q(z);
         if(master){
-         cout << "P(R0 = " << corr0 << ") = " << p << endl;
-          if(ocv.is_open()) ocv << r << " " << p << endl;
+          double ci0=tanh(f-z95*se);
+          double ci1=tanh(f+z95*se);
+          cout << "95%ci(R) = [" << ci0 << ", " << ci1 << "]\n";
+          cout << "P(R0 = " << corr0 << ") = " << p << endl;
+          if(ocv.is_open()) ocv << r << " " << p << " " << ci0 << " " << ci1 << endl;
         }
       }
       else if(ocv.is_open() && master) ocv << r << endl;
@@ -1725,18 +1610,13 @@ void roc(ofstream &ocv,vector<vector<double> > &risk,int ncovar){
 void snp_select(const vector<vector<vector<bool> > > &ai,int nv,
   vector<vector<vector<vector<bool> > > > &av,vector<vector<vector<vector<bool> > > > &aw,
   const vector<string> &rs,vector<string> &ra,const vector<vector<int> > &nptr,
-  const vector<vector<double> > &yk,vector<vector<double> > &ykv,vector<vector<double> > &ykw,
-  const vector<vector<vector<double> > > &covar,const vector<vector<vector<int> > > &cov_ds,
-  vector<vector<vector<double> > > &covv,vector<vector<vector<double> > > &covw){
+  const vector<vector<double> > &yk,vector<vector<double> > &ykv,vector<vector<double> > &ykw){
 
   int nsnp=ai[0][0].size()/2;
   int nsample=nptr.size()-1;
   bool nna=true;
   int nsig=0;
   vector<int> slist;
-  int ncovar=0;
-  if(q_covar) ncovar=covar[0][0].size();   // no. of covariates
-  if(q_covar0) nsnp=0;                     // covariate-only (no SNPs)
 
   for(int i=0;i<nsnp;i++){
     double qtot=0;
@@ -1749,7 +1629,6 @@ void snp_select(const vector<vector<vector<bool> > > &ai,int nv,
       vector<short> ak;
       vector<double> ykl;
       vector<vector<double> > covl;
-//    vector<vector<int> > cov_dsl=cov_ds[s];
       int ymax=(q_qt ? 1 : 2);
       for(int y=0;y<ymax;y++){
         int nsize=nptr[s+1][y]-nptr[s][y];
@@ -1769,12 +1648,8 @@ void snp_select(const vector<vector<vector<bool> > > &ai,int nv,
           if(y==0 && q_qt){
             ak.push_back(a);
             ykl.push_back(yk[s][n]);
-            if(q_covar)
-              covl.push_back(covar[s][n]);
           }
         }
-//      if(y==0 && q_qt && q_covar)
-//        chk_covar(covl,cov_dsl);             // check for invariant covariates
         fr1[y][0]/=nmiss[y];
         fr1[y][1]/=nmiss[y];
         if(q_qt){
@@ -1799,14 +1674,18 @@ void snp_select(const vector<vector<vector<bool> > > &ai,int nv,
             if(code(a,model)>0) t+=fr1[0][a-1];   // total MAF (model-dependent)
           if(t==0)
             nna=false;                            // avoid singular matrix in qtlr_assoc
-          else
-            nna=qtlr_assoc(ak,ykl,nmiss[0],q,h,r2,covl,cov_ds[s],bcov);
+          else{
+            vector<vector<double> > covl;         // dummy variables; not used in CL
+            vector<vector<int> > cov_ds;
+            vector<double> bcov;
+            nna=qtlr_assoc(ak,ykl,nmiss[0],q,h,r2,covl,cov_ds,bcov);
+          }
         }
       }
       if(nna){
         nscount++;
         qtot+=q;
-        nmist+=nmiss[0]-ncovar;
+        nmist+=nmiss[0];
       }
     }
     if(nscount==0) continue;
@@ -1845,17 +1724,11 @@ void snp_select(const vector<vector<vector<bool> > > &ai,int nv,
         }
         if(nv==-1 || (n>=nv*nval && n<(nv+1)*nval)){   // test set (or no CV)
           aw[s][y].push_back(dummy);
-          if(q_qt){
-            ykw[s].push_back(yk[s][n]);
-            if(q_covar) covw[s].push_back(covar[s][n]);
-          }
+          if(q_qt) ykw[s].push_back(yk[s][n]);
         }
         else{
           av[s][y].push_back(dummy);
-          if(q_qt){
-            ykv[s].push_back(yk[s][n]);
-            if(q_covar) covv[s].push_back(covar[s][n]);
-          }
+          if(q_qt) ykv[s].push_back(yk[s][n]);
         }
       }
     }
@@ -1866,8 +1739,7 @@ void snp_select(const vector<vector<vector<bool> > > &ai,int nv,
 
 double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,const vector<vector<double> > &yk,
     bool q_qi,const vector<string> &rs,double lambda,const vector<vector<int> > &nptr,Theta &th,
-    Theta_qt &th_qt,const vector<vector<vector<double> > > &covar,
-    const vector<vector<vector<int> > > &cov_ds,bool &q_crash){
+    Theta_qt &th_qt,bool &q_crash){
 
   double qtot=0;
   double z[3]={0,};
@@ -1876,7 +1748,6 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,const vector<vec
 
   int nsnp=ai[0][0][0].size()/2;
   int npr2=(nsnp<=10 ? 1 : nsnp/10);
-  if(q_covar0) nsnp=0;
   int nsample=nptr.size()-1;   // no. of samples
   vector<vector<vector<vector<double> > > > f1(nsample);   // empirical frequencies of minor alleles
   vector<vector<vector<vector<vector<float> > > > > f2(nsample);   
@@ -1939,11 +1810,6 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,const vector<vec
   double lnz[3]={0,};
   double teff=0;
   th.alpha=0;
-  int ncovar=0;
-  if(q_covar) ncovar=covar[0][0].size();
-  vector<double> bcov0(ncovar);   // covariate coefficients
-  vector<double> bcov1(ncovar);   
-  vector<double> cvar(ncovar);    // covariate variance
 
   for(int s=0;s<nsample;s++){  // loop over samples
     int si= (q_marg? s : 0);
@@ -2079,14 +1945,6 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,const vector<vec
       lkl+=lks;
       qtot+=qtos;
 #endif
-      if(q_qt && q_covar){
-        double qcv=0;                       // infer covariate coefficients
-        qcv=qt_covar(false,yk[s],covar[s],cov_ds[s],bcov0,bcov1,cvar,lambda);
-        vector<double> bn0(ncovar); vector<double> bn1(ncovar); vector<double> cn(ncovar);
-        qcv-=qt_covar(true,yk[s],covar[s],cov_ds[s],bn0,bn1,cn,lambda); // null hypothesis
-        lkl+=qcv;
-        qtot+=2*qcv;
-      }
 
       int ymax=(q_qt? 1: 2);
       for(int y=0;y<ymax;y++) lnz[y]/=nind[y];
@@ -2139,14 +1997,6 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,const vector<vec
             }
           }
         }
-        if(q_covar){
-          th_qt.bcov0.resize(ncovar);
-          th_qt.bcov1.resize(ncovar);
-          th_qt.cvar.resize(ncovar);
-          fill(th_qt.bcov0.begin(),th_qt.bcov0.end(),0);
-          fill(th_qt.bcov1.begin(),th_qt.bcov1.end(),0);
-          fill(th_qt.cvar.begin(),th_qt.cvar.end(),0);
-        }
       }
       for(int y=0;y<2;y++) for(int i=0;i<nsnp;i++) for(int l0=0;l0<L;l0++){
         th_qt.h[y][i][l0]+=h[si][y][i][l0]*neff;
@@ -2154,13 +2004,6 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,const vector<vec
         for(int j=i+1;j<nsnp;j++) for(int l1=0;l1<L;l1++){
           th_qt.J[y][i][j][2*l0+l1]+=J[si][y][i][j][2*l0+l1]*neff;
           th_qt.J[y][j][i][2*l1+l0]=th_qt.J[y][i][j][2*l0+l1];
-        }
-      }
-      if(q_covar){
-        for(int m=0;m<ncovar;m++){
-          th_qt.bcov0[m]+=bcov0[m]*neff;
-          th_qt.bcov1[m]+=bcov1[m]*neff;
-          th_qt.cvar[m]+=cvar[m]*neff;
         }
       }
     }
@@ -2189,11 +2032,6 @@ double cl_gdi(const vector<vector<vector<vector<bool> > > > &ai,const vector<vec
         th_qt.J[y][i][j][2*l0+l1]/=teff;
         th_qt.J[y][j][i][2*l1+l0]/=teff;
       }
-    }
-    for(int m=0;m<ncovar;m++){
-      th_qt.bcov0[m]/=teff;
-      th_qt.bcov1[m]/=teff;
-      th_qt.cvar[m]/=teff;
     }
   }
 
@@ -3242,13 +3080,6 @@ double invC(int nind,const vector<vector<double> > &f1,const vector<vector<vecto
 
 void myshuffle(vector<double> &yk){
 
-//const gsl_rng_type *T;
-//gsl_rng *r;
-//gsl_rng_env_setup();
-//T=gsl_rng_default;
-//r=gsl_rng_alloc(T);
-//gsl_rng_set(r,Seed);
-
   int n=yk.size();
   for(int i=n-1;i>0;i--){
     int j=int(gsl_rng_uniform(r)*(i+1));
@@ -3260,13 +3091,6 @@ void myshuffle(vector<double> &yk){
 
 void ishuffle(vector<int> &indx){
 
-//const gsl_rng_type *T;
-//gsl_rng *r;
-//gsl_rng_env_setup();
-//T=gsl_rng_default;
-//r=gsl_rng_alloc(T);
-//gsl_rng_set(r,Seed);
-
   int n=indx.size();
   for(int i=n-1;i>0;i--){
     int j=int(gsl_rng_uniform(r)*(i+1));
@@ -3275,34 +3099,3 @@ void ishuffle(vector<int> &indx){
     indx[j]=tmp;
   }
 }
-
-void chk_covar(vector<vector<double> > &cov,vector<vector<int> > &cov_ds){
-
-  vector<vector<double> > cov0=cov;
-  vector<vector<int> > cov_ds0=cov_ds;
-
-  int nind=cov0.size();
-  int ncovar=cov0[0].size();
-  for(int n=0;n<nind;n++)
-    cov[n].resize(0);
-  cov_ds.resize(0);
-  int k=0;
-  for(int m=0;m<ncovar;m++){
-    if(cov_ds0[m].size()>0){             // discrete
-      bool flag=true;
-      int c=cov0[0][m];
-      for(int n=1;n<nind;n++){
-        if(cov0[n][m]!=c){
-          flag=false;
-          break;
-        }
-      }
-      if(flag) continue;                       // no variation: skip
-    }
-    for(int n=0;n<nind;n++)
-      cov[n].push_back(cov0[n][m]);
-    cov_ds.push_back(cov_ds0[m]);
-    k++;
-  }
-}
-

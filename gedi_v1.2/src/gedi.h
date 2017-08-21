@@ -10,15 +10,11 @@ struct Theta{
   double alpha;                                         // intercept
   std::vector<std::vector<double> > beta;               // single-snp parameters
   std::vector<std::vector<std::vector<float> > > gamm;  // interactions
-  std::vector<double> bcov;                             // covariate coefficients
 };
 
 struct Theta_qt{
   std::vector<std::vector<std::vector<double> > > h;
   std::vector<std::vector<std::vector<std::vector<float> > > > J;
-  std::vector<double> bcov0;
-  std::vector<double> bcov1;
-  std::vector<double> cvar;
 };
 
 void il_tped(std::string &tped,std::string &tfam,std::string &meta_file,std::string &out_file,bool q_lr);
@@ -76,11 +72,7 @@ void snp_select(const std::vector<std::vector<std::vector<bool> > > &ai,int nv,
     std::vector<std::vector<std::vector<std::vector<bool> > > > &aw,
     const std::vector<std::string> &rs,std::vector<std::string> &ra,
     const std::vector<std::vector<int> > &nptr,const std::vector<std::vector<double> > &yk,
-    std::vector<std::vector<double> > &ykv,std::vector<std::vector<double> > &ykw,
-    const std::vector<std::vector<std::vector<double> > > &covar,
-    const std::vector<std::vector<std::vector<int> > > &covar_dS,
-    std::vector<std::vector<std::vector<double> > > &covv,
-    std::vector<std::vector<std::vector<double> > > &covw);
+    std::vector<std::vector<double> > &ykv,std::vector<std::vector<double> > &ykw);
 
 void snp_select_il(const std::vector<std::vector<std::vector<bool> > > &ai,int nv,
     std::vector<std::vector<std::vector<std::vector<bool> > > > &aw,
@@ -94,27 +86,21 @@ void read_par_cl(const std::vector<std::vector<std::vector<bool> > > &ai,const s
 
 double cl_gdi(const std::vector<std::vector<std::vector<std::vector<bool> > > > &av,
     const std::vector<std::vector<double > > &yk,bool q_qi,const std::vector<std::string> &rs,
-    double lambda,const std::vector<std::vector<int> > &nptr,Theta &th,Theta_qt &th_qt,
-    const std::vector<std::vector<std::vector<double> > > &covv,
-    const std::vector<std::vector<std::vector<int> > > &cov_ds,
-    bool &q_crash);
+    double lambda,const std::vector<std::vector<int> > &nptr,Theta &th,Theta_qt &th_qt,bool &q_crash);
 
 double cl_dlr(const std::vector<std::string> &rs,
     const std::vector<std::vector<std::vector<bool> > > &ai,double lambda,Theta &th,bool q_qi);
 
-double cl_qtlr(const std::vector<std::string> &rs,const std::vector<std::vector<std::vector<bool> > > &ai,const std::vector<double> &yk,double lambda,Theta &th,bool q_qi,
-    const std::vector<std::vector<double> > &cov);
+double cl_qtlr(const std::vector<std::string> &rs,const std::vector<std::vector<std::vector<bool> > > &ai,const std::vector<double> &yk,double lambda,Theta &th,bool q_qi);
 
 void pr_cl(std::ofstream &of,const std::vector<std::vector<std::vector<bool> > > &aw,
     std::vector<std::vector<double> > &risk);
 
 void pr_cl_qt(std::ofstream &of,const std::vector<std::vector<std::vector<std::vector<bool> > > > &aw,
-    const std::vector<std::vector<double> > &yk,Theta_qt &th_qt,std::vector<std::vector<double> > &risk,
-    const std::vector<std::vector<double> > &covar,const std::vector<std::vector<int> > &cov_ds);
+    const std::vector<std::vector<double> > &yk,Theta_qt &th_qt,std::vector<std::vector<double> > &risk);
 
 void pr_cl_qtlr(std::ofstream &of,const std::vector<std::vector<std::vector<std::vector<bool> > > > &ai,
-    const std::vector<std::vector<double> > &yk,Theta &th,std::vector<std::vector<double> > &risk,
-    const std::vector<std::vector<std::vector<double> > > &covar);
+    const std::vector<std::vector<double> > &yk,Theta &th,std::vector<std::vector<double> > &risk);
 
 double lpr(int cc,const std::vector<std::vector<std::vector<bool> > > &ai,
     const std::vector<std::vector<double> > &f1,const std::vector<std::vector<std::vector<float> > > &f2,double lamda,double z[3],std::vector<std::vector<double> > &h,std::vector<std::vector<std::vector<float> > > &J,int i,int j,int s);
@@ -142,24 +128,19 @@ void f12(int cc,const std::vector<std::vector<std::vector<bool> > > &ai,const st
 void tped_read(std::string &tped,std::string &tfam,std::string &meta,std::string &par,int &nsample,
     std::vector<std::vector<int> > &nptr,std::vector<std::vector<std::vector<bool> > > &ai,
     std::vector<std::string> &rs,const std::vector<std::string> &exc_list,
-    std::vector<std::vector<double> > &yk,std::vector<std::vector<std::vector<double> > > &covar,
-    std::vector<std::vector<std::vector<int> > > &cov_ds);
+    std::vector<std::vector<double> > &yk);
 
 void cl_inf(std::vector<std::vector<std::vector<bool> > > &ai,const std::vector<std::vector<int> > &nptr,
     const std::vector<std::vector<double> > &yk,std::string &out_file,std::string &par,
-    bool q_lr,bool q_pr,bool q_qi,int nsample,const std::vector<std::string>&rs,
-    const std::vector<std::vector<std::vector<double> > > &covar,
-    const std::vector<std::vector<std::vector<int> > > &cov_ds);
+    bool q_lr,bool q_pr,bool q_qi,int nsample,const std::vector<std::string>&rs);
 
 void bin_read(std::string &meta,int &nsample,std::vector<std::vector<int> > &nptr,
     std::vector<std::vector<std::vector<bool> > > &ai,std::vector<std::string> &rs,
-    const std::vector<std::string> &exc_list,std::vector<std::vector<double> > &yk,bool q_lr,
-    std::vector<std::vector<std::vector<double> > > &covar,
-    std::vector<std::vector<std::vector<int> > > &cov_ds);
+    const std::vector<std::string> &exc_list,std::vector<std::vector<double> > &yk,bool q_lr);
 
 void par_out(std::ofstream &of,const std::vector<std::string> &ra,double dev,int nsig,
       const std::vector<std::vector<std::vector<std::vector<bool> > > > &aw,Theta &th,Theta_qt &th_qt,
-      bool q_lr,const std::vector<std::vector<int> > &cov_ds);
+      bool q_lr);
 
 void byte2bit(char dat,int bit[8]);
 
@@ -196,17 +177,10 @@ void read_bfm(std::vector<std::string> &mbfile,const std::string& meta,int nind[
 double qt_pl(bool q_null,int i0,const std::vector<std::vector<bool> > &ai,const std::vector<double> &yk,
     const std::vector<std::vector<std::vector<double> > > &f1,const std::vector<std::vector<std::vector<std::vector<float> > > > &f2,double lambda,std::vector<std::vector<std::vector<double> > > &h,std::vector<std::vector<std::vector<std::vector<float> > > > &J,bool &q_crash);
 
-double qt_covar(bool q_null,const std::vector<double> &yk,const std::vector<std::vector<double> > &covar,
-    const std::vector<std::vector<int> > &cov_ds,
-    std::vector<double> &bcov0,std::vector<double> &bcov1,std::vector<double> &cvar,double lambda);
-
 void read_cov(const std::string &file,const std::vector<std::string> &fid,const std::vector<std::string> &iid,std::vector<std::vector<double> > &covar,std::vector<std::vector<int> > &cov_ds);
 
-double dcovar(bool q_null,const std::vector<short> &ak,const std::vector<double> &yk,int cmin,int cmax,double lambda,
-    double h[2]);
+void roc(std::ofstream &ocv,std::vector<std::vector<double> > &risk);
 
 void chk_covar(std::vector<std::vector<double> > &covar,std::vector<std::vector<int> > &covar2);
-
-void roc(std::ofstream &ocv,std::vector<std::vector<double> > &risk,int ncovar);
 
 #endif
