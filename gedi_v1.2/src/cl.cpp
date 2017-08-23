@@ -1241,11 +1241,11 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
             if(q_mf)
               cout << "Cross-validation run " << nv+1 << " with epsilon = " << para[k] << endl;
             else{
-              if(!q_qtil)
+              if(!q_qtil && !(q_qt && q_lr))
                 cout << "Cross-validation run " << nv+1 << " with lambda = (" << Lh
                      << ", " << para[k] << ")\n";
               else
-                cout << "Cross-validation run " << nv+1 << " with lambda = " << Lh << endl;
+                cout << "Cross-validation run " << nv+1 << " with lambda = " << para[k] << endl;
             }
           }
           vector<vector<vector<vector<bool> > > > av(nsample);  // genotype array for training set
@@ -1316,11 +1316,14 @@ void cl_inf(vector<vector<vector<bool> > > &ai,const vector<vector<int> > &nptr,
         if(master){
           if(q_pout) cout << "Mean p-value: " << exp(lnp) << endl;
           if(!q_mf){
-            if(!q_qtil)
+            if(!q_qtil && !(q_qt && q_lr)){
               cout << "lambda = (" << Lh << ", " << para[k] << ")\n";
-            else
-              cout << "lambda = " << Lh << endl;
-            ocv << Lh << " " << para[k] << " ";
+              ocv << Lh << " " << para[k] << " ";
+            }
+            else{
+              cout << "lambda = " << para[k] << endl;
+              ocv << para[k] << " " << para[k] << " ";
+            }
           }
           else{
             cout << "epsilon = " << para[k]<< endl;
@@ -1513,7 +1516,7 @@ void roc(ofstream &ocv,vector<vector<double> > &risk){
       }
       if(ntot>3){
         double f=gsl_atanh(r);
-        double f0=gsl_atanh(r0);
+        double f0=gsl_atanh(corr0);
         double se=1.0/sqrt(ntot-3.0);
         double z=(f-f0)/se;
         double z95=1.959964;
