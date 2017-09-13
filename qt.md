@@ -1,7 +1,5 @@
 ## Quantitative traits
 
-(Under development)
-
 Phenotypes that are quantitative (continuous rather than case-control) can be analyzed by the keyword -qt. The program will expect  file.fam (or file.tfam) file, where the last column (1 or 2 for control or cases) contains the quantitative trait values for each individual. 
 
 ### 1. IL
