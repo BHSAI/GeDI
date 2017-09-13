@@ -67,7 +67,7 @@ Cross validation can be done under the special case of no interaction:
 
     $ gedi -qt -il --bfile file --lh 0.01 0.1 1 10 -pr 
     
-Although this command syntax uses -il, because of -pr and -qt, it will use qt-CL module but with interactions turned off. This special case is in principle equivalent to setting --ld infinity, which, however, is in practice computationally impractical. 
+Although this command syntax uses -il, because of -pr and -qt, it will use qt-CL module but with interactions turned off. This special case is in principle equivalent to setting --ld infinity, but this is not feasible in practice. 
 
 
 ***
