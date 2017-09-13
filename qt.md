@@ -63,6 +63,12 @@ In the bash script above, we run inferences with phenotype labels permuted to sa
 
 This inference will print p-values with the null R0 specified.
 
+Cross validation can be done under the special case of no interaction:
+
+    $ gedi -qt -il --bfile file --lh 0.01 0.1 1 10 -pr 
+    
+Although this command syntax uses -il, because of -pr and -qt, it will use qt-CL module but with interactions turned off. This special case is in principle equivalent to setting --ld infinity, which, however, is in practice computationally impractical. 
+
 
 ***
 [Up](README.md)
