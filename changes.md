@@ -6,7 +6,8 @@
  3. Added parallelized mean field option (-mfp).
  
 ### 2. [Release v1.2]
- 1. Changed default argument for SNP selection (--pcut 1.0).
+ 1. Added quantitative trait inferences (-qt).
+ 2. Changed default argument for SNP selection (--pcut 1.0).
 
 ***
 [Up](README.md)
